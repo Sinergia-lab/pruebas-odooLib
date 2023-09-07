@@ -7,6 +7,7 @@ class OddoDownload:
         self.conn_params = conn_params
         self.connect()
         self.resultadoBusqueda = None
+        self.chunk_size = 50000
     
     def connect(self):
         """
@@ -37,7 +38,7 @@ class OddoDownload:
                 registro[nombre_campo] = registro[nombre_campo][1]
             else:
                 registro[nombre_campo] = str(registro[nombre_campo])
-            return registro
+        return registro
            
     
     def getLlavesForaneas(self,registro):
@@ -56,6 +57,14 @@ class OddoDownload:
                 fks.append(campo)
         return fks
     
+    def getDataChunk(self,model_conn,lista_filtros,lista_campos,offset):
+        """
+        """
+        res = model_conn.search_read(lista_filtros,lista_campos,limit=self.chunk_size,offset=offset)         # get data
+        res = list( map(self.limpiarLlaves,res) )                                                             # limpiar llaves foraneas
+        res = list( map(lambda x:list(x.values()),res) )                                                      # pasar valores de dict a list
+        return np.array(res)
+
     def getDataFromModel(self,modelo,lista_filtros,lista_campos,header=None):
         """
         Descarga los registros desde un modelo almacenado en odoo
@@ -69,30 +78,38 @@ class OddoDownload:
         Returns:
         - Ninguno: El documento generado se guarda como variable dentro del objeto odooDownload
         """
-        self.resultadoBusqueda = None
-        # OBTENER DATOS
-        res = self.conexion.get_model(modelo)
-        res = res.search_read(lista_filtros,lista_campos,limit=50000)
-        if len(res)==0:
-            print('No se descargo ningun registro')
-            return
-        
-        # LIMPIAR LLAVES FORANEAS
-        res = list( map(self.limpiarLlaves,res) )  
 
+        # DESCARGAR DATOS
+        self.resultadoBusqueda = None
+        model_conn = self.conexion.get_model(modelo)
+        
+        res = None
+        offset = 0
+        print('Descargando data')
+        while True:
+            print('.')
+            res_ = self.getDataChunk( model_conn,lista_filtros,lista_campos,offset )
+            
+            if type(res) != np.ndarray:  res = res_
+            else:                        res = np.concatenate( [res,res_],axis=0 )
+
+            offset += self.chunk_size
+            if len(res_) < self.chunk_size:
+                break
+
+        print('done')
 
         # SET HEADER
         if not header and len(lista_campos):    header = ['id'] + lista_campos      # NO HAY HEADER PERO HAY LISTA DE CAMPOS
         elif not header:                        header = res[0].keys()              # NO HAY NI HEADER NI LISTA DE CAMPOS
         else:                                   header = ['id'] + header            # HAY HEADER
 
-        # CREAR DATAFRANE
-        res = list( map(lambda x:list(x.values()),res) )
-        res = np.array(res)
+        # SAVE DATAFRAME
         res = pd.DataFrame(data=res,columns=header)
         # res = res[ header[1:] ]     # QUITAR EL ID
 
         self.resultadoBusqueda = res
+
     
     def downloadExcel(self,ruta,formato='xlsx'):
         """
@@ -108,9 +125,10 @@ class OddoDownload:
         if type(self.resultadoBusqueda) != pd.core.frame.DataFrame:
             print('No se ha descargado ningun modelo o no se encontraron registros')
             return
-
-        if formato=='xlsx':     self.resultadoBusqueda.to_excel(f'{ruta}.xlsx')
-        elif formato=='csv':    self.resultadoBusqueda.to_csv(f'{ruta}.csv')
+        
+        print('Generando archivo')
+        if formato=='xlsx':     self.resultadoBusqueda.to_excel(f'{ruta}.xlsx',index=False)
+        elif formato=='csv':    self.resultadoBusqueda.to_csv(f'{ruta}.csv',index=False)
         else:                   raise Exception('Los formatos de archivo validos son "xlsx" y "csv"')
             
 
