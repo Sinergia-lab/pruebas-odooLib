@@ -20,20 +20,41 @@ class OddoDownload:
                 port=443,
                 protocol='jsonrpcs')
         
-    def limpiarLlaves(self,registro,nombre_campo):
+    def limpiarLlaves(self,registro):
         """
         Al descargar registros del modelo, cuando un campo es una llave foranea de descarga como lista [llave, valor_referencia]. Se realiza un join implicito.
         limpiarLlaves permite eliminar la llave y quedarse solo con el valor legible
 
         Parametros:
         - registro: dict{} que representa un registro (fila) de la tabla
-        - nombre_campo: Nombre del campo a limpiar
 
         Returns: 
         - dict{} qye representa un registro (fila) de la tabla pero sin llave en el campo especificado
         """
-        registro[nombre_campo] = registro[nombre_campo][1]
-        return registro
+        campos_fk = self.getLlavesForaneas(registro)
+        for nombre_campo in campos_fk:
+            if len(registro[nombre_campo]) == 2:
+                registro[nombre_campo] = registro[nombre_campo][1]
+            else:
+                registro[nombre_campo] = str(registro[nombre_campo])
+            return registro
+           
+    
+    def getLlavesForaneas(self,registro):
+        """
+        Encuentra cuales campos son listas con llaves foraneas [llave, valor_referencia]
+
+        Parametros:
+        - registro: dict{} con un registro.
+
+        Returns:
+        - list[] de strings con los nombres de los campos que son listas con llaves foraneas
+        """
+        fks = []
+        for campo in registro.keys():
+            if type(registro[campo]) == list:
+                fks.append(campo)
+        return fks
     
     def getDataFromModel(self,modelo,lista_filtros,lista_campos,header=None):
         """
@@ -48,14 +69,22 @@ class OddoDownload:
         Returns:
         - Ninguno: El documento generado se guarda como variable dentro del objeto odooDownload
         """
-        # SET HEADER
-        if not header:  header = ['id'] + lista_campos
-        else:           header = ['id'] + header
-
+        self.resultadoBusqueda = None
         # OBTENER DATOS
         res = self.conexion.get_model(modelo)
-        res = res.search_read(lista_filtros,lista_campos)
-        res = list( map(lambda x: self.limpiarLlaves(x,'x_studio_stage_id'),res) )        # LIMPIAR LLAVE
+        res = res.search_read(lista_filtros,lista_campos,limit=50000)
+        if len(res)==0:
+            print('No se descargo ningun registro')
+            return
+        
+        # LIMPIAR LLAVES FORANEAS
+        res = list( map(self.limpiarLlaves,res) )  
+
+
+        # SET HEADER
+        if not header and len(lista_campos):    header = ['id'] + lista_campos      # NO HAY HEADER PERO HAY LISTA DE CAMPOS
+        elif not header:                        header = res[0].keys()              # NO HAY NI HEADER NI LISTA DE CAMPOS
+        else:                                   header = ['id'] + header            # HAY HEADER
 
         # CREAR DATAFRANE
         res = list( map(lambda x:list(x.values()),res) )
@@ -77,7 +106,8 @@ class OddoDownload:
         - Ninguno: Se genera un archivo en el disco duro
         """
         if type(self.resultadoBusqueda) != pd.core.frame.DataFrame:
-            raise Exception('No se ha descargado ningun modelo')
+            print('No se ha descargado ningun modelo o no se encontraron registros')
+            return
 
         if formato=='xlsx':     self.resultadoBusqueda.to_excel(f'{ruta}.xlsx')
         elif formato=='csv':    self.resultadoBusqueda.to_csv(f'{ruta}.csv')

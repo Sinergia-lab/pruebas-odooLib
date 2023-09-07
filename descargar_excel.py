@@ -17,14 +17,14 @@ odoo = OddoDownload(conn_params)
 # ==============================================
 
 # ======================= DESCARGA PERSONALIZADA
-# modelo = 'x_productos'
-# filtros = [('x_studio_unidades_de_negocio','=','SMK')]
-# campos = ['x_studio_sku_unidad_de_negocio','x_name','x_studio_stage_id','x_studio_variable_de_marcado','x_studio_candidato_a_analisis_fisico']
+modelo = 'x_materialidad'
+filtros = []
+campos = []
 # header = ['SKU unidad negocio','SKU','Etapa','EVA','Analisis fisivo']
-# odoo.getDataFromModel(modelo,filtros,campos,header)
+odoo.getDataFromModel(modelo,filtros,campos)
 
 # ======================= DESCARGA PREDEFINIDA: DESCOMENTAR LA LINEA CORRESPONDIENTE
-odoo.maestra('SMK')
+# odoo.maestra('SMK')
 # odoo.otroModelo1('Parametros')
 # odoo.otroModelo2('Parametros')
 # odoo.otroModelo3('Parametros')
