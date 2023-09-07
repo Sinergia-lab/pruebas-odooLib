@@ -17,11 +17,11 @@ odoo = OddoConn(conn_params)
 # ==============================================
 
 # ======================= DESCARGA PERSONALIZADA
-modelo = 'x_productos'
-filtros = [('x_studio_unidades_de_negocio','=','SMK')]
-campos = ['x_studio_sku_unidad_de_negocio','x_name','x_studio_stage_id','x_studio_variable_de_marcado','x_studio_candidato_a_analisis_fisico']
-header = ['SKU unidad negocio','SKU','Etapa','EVA','Analisis fisivo']
-odoo.getDataFromModel(modelo,filtros,campos,header)
+# modelo = 'x_productos'
+# filtros = [('x_studio_unidades_de_negocio','=','SMK')]
+# campos = ['x_studio_sku_unidad_de_negocio','x_name','x_studio_stage_id','x_studio_variable_de_marcado','x_studio_candidato_a_analisis_fisico']
+# header = ['SKU unidad negocio','SKU','Etapa','EVA','Analisis fisivo']
+# odoo.getDataFromModel(modelo,filtros,campos,header)
 
 # ======================= DESCARGA PREDEFINIDA: DESCOMENTAR LA LINEA CORRESPONDIENTE
 odoo.maestra('SMK')
