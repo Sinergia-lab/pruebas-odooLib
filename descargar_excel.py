@@ -1,4 +1,4 @@
-import OddoConn
+from OddoDownload import OddoDownload
 
 # ==============================================
 # ============= GENERAR CONEXION ===============
@@ -9,7 +9,7 @@ conn_params = {
     'ODOO_HOSTNAME' : 'sinergia-lab-cencorep-ambiente-test-9601418.dev.odoo.com',
     'ODOO_DATABASE' : 'sinergia-lab-cencorep-ambiente-test-9601418'
 }
-odoo = OddoConn(conn_params)
+odoo = OddoDownload(conn_params)
 
 
 # ==============================================
@@ -28,5 +28,5 @@ odoo.maestra('SMK')
 # odoo.otroModelo1('Parametros')
 # odoo.otroModelo2('Parametros')
 # odoo.otroModelo3('Parametros')
-
-odoo.descargarExcel('ruta/nombre')
+print(len(odoo.resultadoBusqueda))
+odoo.downloadExcel('nombre')
