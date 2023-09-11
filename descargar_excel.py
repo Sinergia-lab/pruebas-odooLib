@@ -17,16 +17,12 @@ odoo = OddoDownload(conn_params)
 # ==============================================
 
 # ======================= DESCARGA PERSONALIZADA
-modelo = 'x_materialidad'
-filtros = []
-campos = []
+# modelo = 'x_materialidad'
+# filtros = []
+# campos = []
 # header = ['SKU unidad negocio','SKU','Etapa','EVA','Analisis fisivo']
-odoo.getDataFromModel(modelo,filtros,campos)
+# odoo.getDataFromModel(modelo,filtros,campos)
 
 # ======================= DESCARGA PREDEFINIDA: DESCOMENTAR LA LINEA CORRESPONDIENTE
 # odoo.maestra('SMK')
-# odoo.otroModelo1('Parametros')
-# odoo.otroModelo2('Parametros')
-# odoo.otroModelo3('Parametros')
-print(len(odoo.resultadoBusqueda))
-odoo.downloadExcel('full materialidad')
+odoo.comunicacion_smk(2023)

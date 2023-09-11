@@ -60,6 +60,14 @@ class OddoDownload:
     
     def getDataChunk(self,model_conn,lista_filtros,lista_campos,offset):
         """
+        Descarga un chunk(lote) de datos. Las tablas muy grandes se dividen en lotes.
+
+        Parametros:
+        - model_conn: Conexion con el modelo. Se obtiene con get_model
+        - lista_filtros: list[] con los filtros a aplicar en la busqueda. Cada filtro representa una sentencia where de sql
+        - lista_campos: list[] con los campos a traer desde el modelo
+        - offset: offset. Se descargaran x cantidad de dato desde 0 + offset
+
         """
         res = model_conn.search_read(lista_filtros,lista_campos,limit=self.chunk_size,offset=offset)         # get data
         res = list( map(self.limpiarLlaves,res) )                                                             # limpiar llaves foraneas
@@ -75,9 +83,11 @@ class OddoDownload:
         - lista_filtros: list[] con los filtros a aplicar en la busqueda. Cada filtro representa una sentencia where de sql
         - lsita_campos: list[] con los campos a traer desde el modelo
         - header: list[] con los nombres de las columnas a insertar en el archivo final. Si es False, entonces se utiliza el nombre de los campos
+        - ret_: bool, si es True entonces en vez de guardarse en como atributo en la clase, la tabla es retornada
 
         Returns:
         - Ninguno: El documento generado se guarda como variable dentro del objeto odooDownload
+        - Si res_ es True entonces se returno un dataframe
         """
 
         # DESCARGAR DATOS
@@ -150,10 +160,21 @@ class OddoDownload:
         modelo = 'x_productos'
         filtros = [('x_studio_unidades_de_negocio','=',unidad_negocio)]
         campos = ['x_studio_sku_unidad_de_negocio','x_name','x_studio_stage_id','x_studio_variable_de_marcado','x_studio_candidato_a_analisis_fisico']
-        header = ['SKU unidad negocio','SKU','Etapa','EVA','Analisis fisivo']
+        header = ['SKU unidad negocio','SKU','Etapa','EVA','Analisis fisico']
         self.getDataFromModel(modelo,filtros,campos,header)
+        self.downloadExcel('Maestra','csv')
+        print('Se ha generado el archivo Maestra.csv')
     
     def comunicacion_smk(self,anho):
+        """
+        Descarga la tabla de comunicacion masiva para smk
+
+        Parametros:
+        - anho: Periodo que se quiere descargar
+
+        Returns:
+        - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
+        """
 
         # PARAMETROS
         filtro1 = ["&","&",["x_studio_periodos.x_name","=",anho],["x_studio_unidades_de_negocio","=","SMK"],"|",["x_studio_stage_id","=",2],["x_studio_stage_id","=",5]]
@@ -196,6 +217,8 @@ class OddoDownload:
         os.remove('temp1.csv')
         os.remove('temp2.csv')
         os.remove('temp3.csv')
+
+        print('Se ha generado el archivo Comunicacion masiva.csv')
 
 
         
