@@ -1,6 +1,7 @@
 import odoolib
 import pandas as pd
 import numpy as np
+import os
 
 class OddoDownload:
     def __init__(self,conn_params):
@@ -65,7 +66,7 @@ class OddoDownload:
         res = list( map(lambda x:list(x.values()),res) )                                                      # pasar valores de dict a list
         return np.array(res)
 
-    def getDataFromModel(self,modelo,lista_filtros,lista_campos,header=None):
+    def getDataFromModel(self,modelo,lista_filtros,lista_campos,header=None,ret_=False):
         """
         Descarga los registros desde un modelo almacenado en odoo
 
@@ -105,10 +106,14 @@ class OddoDownload:
         else:                                   header = ['id'] + header            # HAY HEADER
 
         # SAVE DATAFRAME
-        res = pd.DataFrame(data=res,columns=header)
-        # res = res[ header[1:] ]     # QUITAR EL ID
+        if not len(res):        res = pd.DataFrame(columns=header)
+        else:                   res = pd.DataFrame(data=res,columns=header)
+        res = res.drop(['id'],axis=1)
 
-        self.resultadoBusqueda = res
+        if ret_:
+            return res
+        else:
+            self.resultadoBusqueda = res
 
     
     def downloadExcel(self,ruta,formato='xlsx'):
@@ -147,4 +152,50 @@ class OddoDownload:
         campos = ['x_studio_sku_unidad_de_negocio','x_name','x_studio_stage_id','x_studio_variable_de_marcado','x_studio_candidato_a_analisis_fisico']
         header = ['SKU unidad negocio','SKU','Etapa','EVA','Analisis fisivo']
         self.getDataFromModel(modelo,filtros,campos,header)
+    
+    def comunicacion_smk(self,anho):
 
+        # PARAMETROS
+        filtro1 = ["&","&",["x_studio_periodos.x_name","=",anho],["x_studio_unidades_de_negocio","=","SMK"],"|",["x_studio_stage_id","=",2],["x_studio_stage_id","=",5]]
+        filtro2 = ["&","&",["x_studio_unidades_de_negocio","=","SMK"],["x_studio_stage_id","=",3],["x_studio_variable_de_marcado","=",1]]
+        filtro3 = ["&","&",["x_studio_periodos","=",False],["x_studio_unidades_de_negocio","=","SMK"],"|",["x_studio_stage_id","=",2],["x_studio_stage_id","=",5]]
+        campos = ['x_studio_sku_unidad_de_negocio','x_studio_cdigo_regional','x_studio_descripcin','x_studio_ean','x_studio_proveedor','x_studio_equipo',
+          'x_studio_pm_asociado','x_studio_trazabilidad_levantamiento','x_studio_stage_id']
+        modelo = 'x_productos'
+        header = ['SKU unidad negocio','Codigo regional','Descripcion','EAN','Proveedor','Equipo','PM asociado','Trazabilidad levantamiento','Etapa']
+
+        # DESCARGA DE TABLAS
+        self.getDataFromModel(modelo,filtro1,campos,header=header)
+        self.downloadExcel('temp1',formato='csv')
+        self.getDataFromModel(modelo,filtro2,campos,header=header)
+        self.downloadExcel('temp2',formato='csv')
+        self.getDataFromModel(modelo,filtro3,campos,header=header)
+        self.downloadExcel('temp3',formato='csv')
+
+        # JUNTAR TABLAS
+        f1 = pd.read_csv('temp1.csv')
+        f2 = pd.read_csv('temp2.csv')
+        f3 = pd.read_csv('temp3.csv')
+        f_final = pd.concat([f1,f2,f3],axis=0,ignore_index=1)
+        # ADJUNTA CORREO
+        actores = self.getDataFromModel('x_actores_relevantes',[],['x_name','x_studio_partner_email'],ret_=True)
+        lista_correos = []                                                              
+        for pm in f_final['PM asociado']:
+            try:
+                email = actores[actores['x_name']==pm]['x_studio_partner_email'].values[0]
+                lista_correos.append(email)
+            except:
+                lista_correos.append(False)
+        lista_correos = pd.Series(lista_correos)
+        f_final['PM asociado/Correo electrónico'] = lista_correos
+        f_final = f_final[['SKU unidad negocio','Codigo regional','Descripcion','EAN','Proveedor','Equipo','PM asociado','PM asociado/Correo electrónico','Trazabilidad levantamiento','Etapa']]
+
+        f_final.to_csv('Comunicacion masiva.csv',index=False)
+
+        # BORRAR ARCHIVOS TEMPORALES
+        os.remove('temp1.csv')
+        os.remove('temp2.csv')
+        os.remove('temp3.csv')
+
+
+        
