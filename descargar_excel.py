@@ -25,4 +25,5 @@ odoo = OddoDownload(conn_params)
 
 # ======================= DESCARGA PREDEFINIDA: DESCOMENTAR LA LINEA CORRESPONDIENTE
 # odoo.maestra('SMK')
-odoo.comunicacion_smk(2023)
+# odoo.comunicacion_smk(2023)
+odoo.declaracion_eye_smk('JUMBO',2023)
