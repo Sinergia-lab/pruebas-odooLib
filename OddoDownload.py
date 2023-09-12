@@ -22,7 +22,7 @@ class OddoDownload:
                 port=443,
                 protocol='jsonrpcs')
         
-    def limpiarLlaves(self,registro):
+    def gestionarListas(self,registro,campos_fk):
         """
         Al descargar registros del modelo, cuando un campo es una llave foranea de descarga como lista [llave, valor_referencia]. Se realiza un join implicito.
         limpiarLlaves permite eliminar la llave y quedarse solo con el valor legible
@@ -33,32 +33,16 @@ class OddoDownload:
         Returns: 
         - dict{} qye representa un registro (fila) de la tabla pero sin llave en el campo especificado
         """
-        campos_fk = self.getLlavesForaneas(registro)
-        for nombre_campo in campos_fk:
-            if len(registro[nombre_campo]) == 2:
+        campos = list(registro.keys())
+
+        for nombre_campo in campos:
+            if (nombre_campo in campos_fk) and type(registro[nombre_campo]) == list:
                 registro[nombre_campo] = registro[nombre_campo][1]
-            else:
+            elif type(registro[nombre_campo]) == list:
                 registro[nombre_campo] = str(registro[nombre_campo])
         return registro
-           
     
-    def getLlavesForaneas(self,registro):
-        """
-        Encuentra cuales campos son listas con llaves foraneas [llave, valor_referencia]
-
-        Parametros:
-        - registro: dict{} con un registro.
-
-        Returns:
-        - list[] de strings con los nombres de los campos que son listas con llaves foraneas
-        """
-        fks = []
-        for campo in registro.keys():
-            if type(registro[campo]) == list:
-                fks.append(campo)
-        return fks
-    
-    def getDataChunk(self,model_conn,lista_filtros,lista_campos,offset):
+    def getDataChunk(self,model_conn,lista_filtros,lista_campos,offset,campos_fk):
         """
         Descarga un chunk(lote) de datos. Las tablas muy grandes se dividen en lotes.
 
@@ -70,11 +54,11 @@ class OddoDownload:
 
         """
         res = model_conn.search_read(lista_filtros,lista_campos,limit=self.chunk_size,offset=offset)         # get data
-        res = list( map(self.limpiarLlaves,res) )                                                             # limpiar llaves foraneas
+        res = list( map(lambda x:self.gestionarListas(x,campos_fk),res) )
         res = list( map(lambda x:list(x.values()),res) )                                                      # pasar valores de dict a list
         return np.array(res)
 
-    def getDataFromModel(self,modelo,lista_filtros,lista_campos,header=None,ret_=False):
+    def getDataFromModel(self,modelo,lista_filtros,lista_campos,header=None,ret_=False,campos_fk=[],drop_id=True):
         """
         Descarga los registros desde un modelo almacenado en odoo
 
@@ -96,10 +80,10 @@ class OddoDownload:
         
         res = None
         offset = 0
-        print('Descargando data')
+        print('Descargando data desde',modelo)
         while True:
             print('.')
-            res_ = self.getDataChunk( model_conn,lista_filtros,lista_campos,offset )
+            res_ = self.getDataChunk( model_conn,lista_filtros,lista_campos,offset,campos_fk )
             
             if type(res) != np.ndarray:  res = res_
             else:                        res = np.concatenate( [res,res_],axis=0 )
@@ -118,12 +102,12 @@ class OddoDownload:
         # SAVE DATAFRAME
         if not len(res):        res = pd.DataFrame(columns=header)
         else:                   res = pd.DataFrame(data=res,columns=header)
-        res = res.drop(['id'],axis=1)
 
-        if ret_:
-            return res
-        else:
-            self.resultadoBusqueda = res
+        if drop_id:
+            res = res.drop(['id'],axis=1)
+
+        if ret_:        return res
+        else:           self.resultadoBusqueda = res
 
     
     def downloadExcel(self,ruta,formato='xlsx'):
@@ -161,7 +145,9 @@ class OddoDownload:
         filtros = [('x_studio_unidades_de_negocio','=',unidad_negocio)]
         campos = ['x_studio_sku_unidad_de_negocio','x_name','x_studio_stage_id','x_studio_variable_de_marcado','x_studio_candidato_a_analisis_fisico']
         header = ['SKU unidad negocio','SKU','Etapa','EVA','Analisis fisico']
-        self.getDataFromModel(modelo,filtros,campos,header)
+        campos_fk = ['x_studio_stage_id']
+        
+        self.getDataFromModel(modelo,filtros,campos,header,campos_fk=campos_fk)
         self.downloadExcel('Maestra','csv')
         print('Se ha generado el archivo Maestra.csv')
     
@@ -184,13 +170,14 @@ class OddoDownload:
           'x_studio_pm_asociado','x_studio_trazabilidad_levantamiento','x_studio_stage_id']
         modelo = 'x_productos'
         header = ['SKU unidad negocio','Codigo regional','Descripcion','EAN','Proveedor','Equipo','PM asociado','Trazabilidad levantamiento','Etapa']
+        campos_fk = ['x_studio_proveedor','x_studio_equipo','x_studio_pm_asociado','x_studio_trazabilidad_levantamiento','x_studio_stage_id']
 
         # DESCARGA DE TABLAS
-        self.getDataFromModel(modelo,filtro1,campos,header=header)
+        self.getDataFromModel(modelo,filtro1,campos,header=header,campos_fk=campos_fk)
         self.downloadExcel('temp1',formato='csv')
-        self.getDataFromModel(modelo,filtro2,campos,header=header)
+        self.getDataFromModel(modelo,filtro2,campos,header=header,campos_fk=campos_fk)
         self.downloadExcel('temp2',formato='csv')
-        self.getDataFromModel(modelo,filtro3,campos,header=header)
+        self.getDataFromModel(modelo,filtro3,campos,header=header,campos_fk=campos_fk)
         self.downloadExcel('temp3',formato='csv')
 
         # JUNTAR TABLAS
