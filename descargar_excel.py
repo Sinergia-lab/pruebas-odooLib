@@ -27,7 +27,7 @@ odoo_corona = OdooDownloadCorona(conn_params_corona)
 # ======================= DESCARGA PREDEFINIDA: DESCOMENTAR LA LINEA CORRESPONDIENTE
 # odoo_cenco.maestra('SMK')
 # odoo_cenco.comunicacion_masiva(2023,'SMK')
-# odoo_cenco.declaracion_eye_smk('JUMBO',2023)
+# odoo_cenco.declaracion_eye('JUMBO',2023)
 
 
 # odoo_corona.maestra()

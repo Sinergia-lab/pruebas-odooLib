@@ -413,5 +413,5 @@ class OdooDownloadCorona(OdooDownloadBase):
 
         print('Se ha generado el archivo Comunicacion masiva.csv')
 
-    def declaracion_eye(self):
+    def declaracion_eye(self,periodo):
         pass
