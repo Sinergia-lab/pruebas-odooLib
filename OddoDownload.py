@@ -4,7 +4,8 @@ import numpy as np
 import os
 from tqdm import tqdm
 
-class OddoDownload:
+
+class OdooDownloadBase:
     def __init__(self,conn_params):
         self.conn_params = conn_params
         self.connect()
@@ -140,6 +141,7 @@ class OddoDownload:
     # PLANTILLAS PREDEFINIDAS
     # ============================
 
+class OdooDownloadCenco(OdooDownloadBase):
     def maestra(self,unidad_negocio):
         """
         Shortcut con parametros para descargar la tabla Maestra
@@ -162,7 +164,7 @@ class OddoDownload:
         self.downloadExcel('Maestra','csv')
         print('Se ha generado el archivo Maestra.csv')
     
-    def comunicacion_smk(self,anho):
+    def comunicacion_masiva(self,anho,unidad_negocio):
         """
         Descarga la tabla de comunicacion masiva para smk
 
@@ -174,9 +176,9 @@ class OddoDownload:
         """
 
         # PARAMETROS
-        filtro1 = ["&","&",["x_studio_periodos.x_name","=",anho],["x_studio_unidades_de_negocio","=","SMK"],"|",["x_studio_stage_id","=",2],["x_studio_stage_id","=",5]]
-        filtro2 = ["&","&","&",["x_studio_periodos.x_name","=",anho],["x_studio_unidades_de_negocio","=","SMK"],["x_studio_stage_id","=",3],["x_studio_variable_de_marcado","=",1]]
-        filtro3 = ["&","&",["x_studio_periodos","=",False],["x_studio_unidades_de_negocio","=","SMK"],"|",["x_studio_stage_id","=",2],["x_studio_stage_id","=",5]]
+        filtro1 = ["&","&",["x_studio_periodos.x_name","=",anho],["x_studio_unidades_de_negocio","=",unidad_negocio],"|",["x_studio_stage_id","=",2],["x_studio_stage_id","=",5]]
+        filtro2 = ["&","&","&",["x_studio_periodos.x_name","=",anho],["x_studio_unidades_de_negocio","=",unidad_negocio],["x_studio_stage_id","=",3],["x_studio_variable_de_marcado","=",1]]
+        filtro3 = ["&","&",["x_studio_periodos","=",False],["x_studio_unidades_de_negocio","=",unidad_negocio],"|",["x_studio_stage_id","=",2],["x_studio_stage_id","=",5]]
         campos = ['x_studio_sku_unidad_de_negocio','x_studio_cdigo_regional','x_studio_descripcin','x_studio_ean','x_studio_proveedor','x_studio_equipo',
           'x_studio_pm_asociado','x_studio_trazabilidad_levantamiento','x_studio_stage_id']
         modelo = 'x_productos'
@@ -221,7 +223,7 @@ class OddoDownload:
 
         print('Se ha generado el archivo Comunicacion masiva.csv')
 
-    def declaracion_eye_smk(self,unidad_negocio,periodo):
+    def declaracion_eye(self,unidad_negocio,periodo):
         if unidad_negocio not in ['JUMBO','SISA']:
             raise Exception('La unidad de negocio debe ser "JUMBO" o "SISA"')
         
@@ -325,3 +327,91 @@ class OddoDownload:
         # ==================================
         self.resultadoBusqueda = declaracion_eye
         self.downloadExcel(f'Declaracion_eye_smk_{unidad_negocio}','xlsx')
+
+class OdooDownloadCorona(OdooDownloadBase):
+
+    def maestra(self):
+        modelo = 'x_productos'
+        filtros = []
+        campos = ['x_name','x_studio_stage_id']
+        header = ['Name','Etapa']
+        campos_fk = ['x_studio_stage_id']
+        borrar_truefalse = ['Name']
+
+        self.getDataFromModel(modelo,filtros,campos,header=header,campos_fk=campos_fk)
+        self.resultadoBusqueda = self.quitarTrueFalse(self.resultadoBusqueda,borrar_truefalse)
+
+        self.downloadExcel('Maestra','csv')
+        print('Se ha generado el archivo Maestra.csv')
+    
+    def maestra_homologos(self):
+        modelo = 'x_productos'
+        filtros = []
+        campos = ['x_studio_ean','x_studio_estilo_1','x_name','x_studio_url','x_studio_hoja','x_studio_notes']
+        header = ['EAN','Estilo','Name','URL','HOJA','Notas']
+        campos_fk = []
+        borrar_truefalse = ['EAN','Estilo','Name','URL','HOJA','Notas']
+
+        self.getDataFromModel(modelo,filtros,campos,header=header,campos_fk=campos_fk)
+        self.resultadoBusqueda = self.quitarTrueFalse(self.resultadoBusqueda,borrar_truefalse)
+
+        self.downloadExcel('Maestra_homologos','csv')
+        print('Se ha generado el archivo Maestra_homologos.csv')        
+
+    def comunicacion_masiva(self,periodo):
+        no_completado_nuevo = 1
+        no_completado_revision = 2
+        completado = 3
+        proyectado = 4
+        completado_parcial = 5
+
+        modelo = 'x_productos'
+        campos = ['x_name','x_studio_estilo_1','x_studio_descripcin_larga','x_studio_ean','x_studio_proveedor','x_studio_pm_asociado','x_studio_productos_trazabilidad','x_studio_stage_id']
+        header = ['Name','Estilo','Descripción larga','EAN','Proveedor','PM asociado','Trazabilidad levantamiento','Etapa']
+        campos_fk = ['x_studio_proveedor','x_studio_pm_asociado','x_studio_productos_trazabilidad','x_studio_stage_id']
+        borrar_truefalse = ['EAN','Trazabilidad levantamiento']
+
+
+        filtro1 = ["&",["x_studio_periodos.x_name","=",periodo],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision,proyectado,completado_parcial]]]
+        filtro2 = ["&","&",["x_studio_periodos.x_name","=",periodo],["x_studio_stage_id","=",completado],["x_studio_aux","=",1]]
+        filtro3 = ["&",["x_studio_periodos","=",False],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision,proyectado,completado_parcial]]]
+
+        self.getDataFromModel(modelo,filtro1,campos,header=header,campos_fk=campos_fk)
+        self.downloadExcel('temp1',formato='csv')
+        self.getDataFromModel(modelo,filtro2,campos,header=header,campos_fk=campos_fk)
+        self.downloadExcel('temp2',formato='csv')
+        self.getDataFromModel(modelo,filtro3,campos,header=header,campos_fk=campos_fk)
+        self.downloadExcel('temp3',formato='csv')
+
+        # JUNTAR TABLAS
+        f1 = pd.read_csv('temp1.csv')
+        f2 = pd.read_csv('temp2.csv')
+        f3 = pd.read_csv('temp3.csv')
+        f_final = pd.concat([f1,f2,f3],axis=0,ignore_index=1)
+
+        # ADJUNTA CORREO
+        actores = self.getDataFromModel('x_actores_relevantes',[],['x_name','x_studio_partner_email'],ret_=True)
+        lista_correos = []                                                              
+        for pm in f_final['PM asociado']:
+            try:
+                email = actores[actores['x_name']==pm]['x_studio_partner_email'].values[0]
+                lista_correos.append(email)
+            except:
+                lista_correos.append(False)
+        lista_correos = pd.Series(lista_correos)
+        f_final['PM asociado/Correo electrónico'] = lista_correos
+        f_final = f_final[['Name','Estilo','Descripción larga','EAN','Proveedor','PM asociado','PM asociado/Correo electrónico','Trazabilidad levantamiento','Etapa']]
+
+        # DESCARGAR EXCEL
+        f_final = self.quitarTrueFalse(f_final,borrar_truefalse)
+        f_final.to_csv('Comunicacion masiva.csv',index=False)
+
+        # BORRAR ARCHIVOS TEMPORALES
+        os.remove('temp1.csv')
+        os.remove('temp2.csv')
+        os.remove('temp3.csv')
+
+        print('Se ha generado el archivo Comunicacion masiva.csv')
+
+    def declaracion_eye(self):
+        pass
