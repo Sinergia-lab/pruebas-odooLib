@@ -131,6 +131,11 @@ class OddoDownload:
         elif formato=='csv':    self.resultadoBusqueda.to_csv(f'{ruta}.csv',index=False)
         else:                   raise Exception('Los formatos de archivo validos son "xlsx" y "csv"')
             
+    def quitarTrueFalse(self,df,campos,to_replace=''):
+        for campo in campos:
+            df[campo] = df[campo].replace('True',to_replace)
+            df[campo] = df[campo].replace('False',to_replace)
+        return df
     # ============================
     # PLANTILLAS PREDEFINIDAS
     # ============================
@@ -150,8 +155,10 @@ class OddoDownload:
         campos = ['x_studio_sku_unidad_de_negocio','x_name','x_studio_stage_id','x_studio_variable_de_marcado','x_studio_candidato_a_analisis_fisico']
         header = ['SKU unidad negocio','SKU','Etapa','EVA','Analisis fisico']
         campos_fk = ['x_studio_stage_id']
+        borrar_truefalse = ['SKU unidad negocio','SKU']
         
         self.getDataFromModel(modelo,filtros,campos,header,campos_fk=campos_fk)
+        self.resultadoBusqueda = self.quitarTrueFalse(self.resultadoBusqueda,borrar_truefalse)
         self.downloadExcel('Maestra','csv')
         print('Se ha generado el archivo Maestra.csv')
     
@@ -168,13 +175,14 @@ class OddoDownload:
 
         # PARAMETROS
         filtro1 = ["&","&",["x_studio_periodos.x_name","=",anho],["x_studio_unidades_de_negocio","=","SMK"],"|",["x_studio_stage_id","=",2],["x_studio_stage_id","=",5]]
-        filtro2 = ["&","&",["x_studio_unidades_de_negocio","=","SMK"],["x_studio_stage_id","=",3],["x_studio_variable_de_marcado","=",1]]
+        filtro2 = ["&","&","&",["x_studio_periodos.x_name","=",anho],["x_studio_unidades_de_negocio","=","SMK"],["x_studio_stage_id","=",3],["x_studio_variable_de_marcado","=",1]]
         filtro3 = ["&","&",["x_studio_periodos","=",False],["x_studio_unidades_de_negocio","=","SMK"],"|",["x_studio_stage_id","=",2],["x_studio_stage_id","=",5]]
         campos = ['x_studio_sku_unidad_de_negocio','x_studio_cdigo_regional','x_studio_descripcin','x_studio_ean','x_studio_proveedor','x_studio_equipo',
           'x_studio_pm_asociado','x_studio_trazabilidad_levantamiento','x_studio_stage_id']
         modelo = 'x_productos'
         header = ['SKU unidad negocio','Codigo regional','Descripcion','EAN','Proveedor','Equipo','PM asociado','Trazabilidad levantamiento','Etapa']
         campos_fk = ['x_studio_proveedor','x_studio_equipo','x_studio_pm_asociado','x_studio_trazabilidad_levantamiento','x_studio_stage_id']
+        borrar_truefalse = ['EAN','Trazabilidad levantamiento','Codigo regional']
 
         # DESCARGA DE TABLAS
         self.getDataFromModel(modelo,filtro1,campos,header=header,campos_fk=campos_fk)
@@ -201,7 +209,9 @@ class OddoDownload:
         lista_correos = pd.Series(lista_correos)
         f_final['PM asociado/Correo electrónico'] = lista_correos
         f_final = f_final[['SKU unidad negocio','Codigo regional','Descripcion','EAN','Proveedor','Equipo','PM asociado','PM asociado/Correo electrónico','Trazabilidad levantamiento','Etapa']]
-
+        
+        # LIMPIA TRUE-FALSE Y GUARDA
+        f_final = self.quitarTrueFalse(f_final,borrar_truefalse)
         f_final.to_csv('Comunicacion masiva.csv',index=False)
 
         # BORRAR ARCHIVOS TEMPORALES
@@ -314,4 +324,4 @@ class OddoDownload:
         # DESCARGAR
         # ==================================
         self.resultadoBusqueda = declaracion_eye
-        self.downloadExcel(f'Declaracion_eye_smk_{unidad_negocio}','csv')
+        self.downloadExcel(f'Declaracion_eye_smk_{unidad_negocio}','xlsx')
