@@ -414,4 +414,111 @@ class OdooDownloadCorona(OdooDownloadBase):
         print('Se ha generado el archivo Comunicacion masiva.csv')
 
     def declaracion_eye(self,periodo):
+        
+        # =========================
+        # DESCARGAR TABLA DE VENTAS
+        # =========================
+
+        modelo = 'x_unidades_vendidas'
+        filtros = [('x_studio_periodo.x_name','=',periodo)]
+        campos = ['x_studio_producto','x_studio_total_venta']
+        header = ['Producto','Total venta'] 
+        campos_fk = ['x_studio_producto']
+
+        un_vendidas = self.getDataFromModel(modelo,filtros,campos,header,campos_fk=campos_fk,ret_=True)
+        
+        # =========================
+        # DESCARGAR PRODUCTOS
+        # =========================
+
+        prods_vendidos =  un_vendidas['Producto'].to_list()
+
+        modelo = 'x_productos'
+        filtros = [('x_name','in',prods_vendidos)]
+        campos = ['x_name','x_studio_todas_las_partes']
+        header = ['Codigo spp','lista elementos'] 
+        campos_fk = []
+
+        productos = self.getDataFromModel(modelo,filtros,campos,header=header,ret_=True)
+
+        # =============================
+        # CONTAR ELEMENTOS A DESCARGAR
+        # ============================
+        total_elementos = []
+        for i in range(len(productos)):
+            elementos = eval(productos['lista elementos'].iloc[i])
+            total_elementos += elementos
+
+        # =======================================
+        # DESCARGAR ELEMENTOS NESDE MATERIALIDAD
+        # =======================================
+        modelo = 'x_materialidad'
+        filtros = [('id','in',total_elementos)]
+        campos = ['x_studio_producto','x_studio_descripcin','x_name','x_studio_productos_por_envase','x_studio_peso','x_studio_peso_informado',
+                'x_studio_material','x_studio_caracterstica_del_material','x_studio_definir_otro_material','x_studio_caracteristica_reciclable',
+                'x_studio_caracteristica_retornable','x_studio_peligrosidad','x_studio_categora','x_studio_sub_categora_material']
+
+        header = ['Producto','Descripción','Todas las partes','Productos por envase','Peso','Peso informado',
+                'Material','Característica del material','Definir otro material','Característica reciclable',
+                'Caracteristica retornable','Peligrosidad','Categoría','Sub-categoría material']
+        campos_fk = ['x_studio_producto']
+
+        elementos = self.getDataFromModel(modelo,filtros,campos,header=header,campos_fk=campos_fk, ret_=True,drop_id=False)
+        
+        # ===========================
+        # CREAR TABLA FINAL
+        # ===========================
+
+        header1 = ['Producto'] 
+        header2 = ['Descripción','Todas las partes','Productos por envase','Peso','Peso informado',
+                'Material','Característica del material','Definir otro material','Característica reciclable',
+                'Caracteristica retornable','Peligrosidad','Categoría','Sub-categoría material']
+        header3 = ['Total venta']
+        final_header = header1 + header2 + header3
+
+        n_campos = len(final_header)
+        declaracion_eye = np.zeros( (len(total_elementos),n_campos),dtype='object' )
+
+        index_declaracion = 0
+        for i in tqdm(range(len(un_vendidas))):                                      # POR CADA FILA EN VENTAS (tabla x_ventas)
+            parte1 = un_vendidas[header1].iloc[i].to_numpy().reshape(1,-1)  
+            parte3 = un_vendidas[header3].iloc[i].to_numpy().reshape(1,-1)
+            producto = un_vendidas.iloc[i]['Producto']
+            lista_elementos = eval(productos[productos['Codigo spp']==producto]['lista elementos'].iloc[0])
+
+            for elemento in lista_elementos:
+                detalle_elemento = elementos[ elementos['id']==str(elemento) ]
+                detalle_elemento = detalle_elemento[header2].to_numpy().reshape(1,-1)
+                row_declaracion = np.concatenate([parte1,detalle_elemento,parte3],axis=1)
+
+                declaracion_eye[index_declaracion] = row_declaracion                # ANADE EL ELEMENTO A LA TABLA FINAL
+                index_declaracion += 1
+
+        declaracion_eye = pd.DataFrame(data=declaracion_eye,columns=final_header)
+        declaracion_eye = declaracion_eye[(declaracion_eye['Categoría']=='EYE Domiciliario') | (declaracion_eye['Categoría']=='EYE No domiciliario')]
+
+        # ==================================                        
+        # CALCULO DE PESO*UNIDADES VENDIDAS
+        # ==================================
+        declaracion_eye['Peso']=declaracion_eye['Peso'].astype('float')
+        declaracion_eye['Peso informado']=declaracion_eye['Peso informado'].astype('float')
+        declaracion_eye['Total venta']=declaracion_eye['Total venta'].astype('float')
+
+        declaracion_eye['Peso total (gr)'] = declaracion_eye['Total venta']*declaracion_eye['Peso']
+        declaracion_eye['Peso total (kg)'] = 1e-3*declaracion_eye['Total venta']*declaracion_eye['Peso']
+        declaracion_eye['Peso total (ton)'] = 1e-6*declaracion_eye['Total venta']*declaracion_eye['Peso']
+
+        # ==================================                        
+        # DESCARGAR
+        # ==================================
+        campos_false = ['Descripción','Todas las partes','Productos por envase','Peso','Peso informado',
+                'Material','Característica del material','Definir otro material','Característica reciclable',
+                'Caracteristica retornable','Peligrosidad','Categoría','Sub-categoría material']
+        declaracion_eye = self.quitarTrueFalse(declaracion_eye,campos_false)
+        self.resultadoBusqueda = declaracion_eye
+        self.downloadExcel(f'Declaracion_eye_corona','xlsx')
+
+
+class OdooDownloadTottus(OdooDownloadBase):
+    def maestra(self):
         pass

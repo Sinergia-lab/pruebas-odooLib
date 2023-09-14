@@ -32,5 +32,5 @@ odoo_corona = OdooDownloadCorona(conn_params_corona)
 
 # odoo_corona.maestra()
 # odoo_corona.maestra_homologos()
-
-odoo_corona.comunicacion_masiva(2023)
+# odoo_corona.comunicacion_masiva(2023)
+odoo_corona.declaracion_eye(2023)
