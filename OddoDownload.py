@@ -252,7 +252,7 @@ class OdooDownloadCenco(OdooDownloadBase):
         for i in range(len(ventas)):
             elementos = eval(ventas['lista_elementos'].iloc[i])
             total_elementos += elementos
-        len(set(total_elementos))
+
 
         # ===========================
         # DESCARGAR DETALLE DE PARTES
@@ -359,12 +359,15 @@ class OdooDownloadCorona(OdooDownloadBase):
         print('Se ha generado el archivo Maestra_homologos.csv')        
 
     def comunicacion_masiva(self,periodo):
+
+        # CODIGOS DE ETAPA DE ESTUDIOS
         no_completado_nuevo = 1
         no_completado_revision = 2
         completado = 3
         proyectado = 4
         completado_parcial = 5
 
+        # parametros de descarga
         modelo = 'x_productos'
         campos = ['x_name','x_studio_estilo_1','x_studio_descripcin_larga','x_studio_ean','x_studio_proveedor','x_studio_pm_asociado','x_studio_productos_trazabilidad','x_studio_stage_id']
         header = ['Name','Estilo','Descripción larga','EAN','Proveedor','PM asociado','Trazabilidad levantamiento','Etapa']
@@ -376,6 +379,7 @@ class OdooDownloadCorona(OdooDownloadBase):
         filtro2 = ["&","&",["x_studio_periodos.x_name","=",periodo],["x_studio_stage_id","=",completado],["x_studio_aux","=",1]]
         filtro3 = ["&",["x_studio_periodos","=",False],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision,proyectado,completado_parcial]]]
 
+        # DESARGAR LAS TABLAS
         self.getDataFromModel(modelo,filtro1,campos,header=header,campos_fk=campos_fk)
         self.downloadExcel('temp1',formato='csv')
         self.getDataFromModel(modelo,filtro2,campos,header=header,campos_fk=campos_fk)
@@ -448,7 +452,6 @@ class OdooDownloadCorona(OdooDownloadBase):
         for i in range(len(productos)):
             elementos = eval(productos['lista elementos'].iloc[i])
             total_elementos += elementos
-
         # =======================================
         # DESCARGAR ELEMENTOS NESDE MATERIALIDAD
         # =======================================
@@ -521,4 +524,161 @@ class OdooDownloadCorona(OdooDownloadBase):
 
 class OdooDownloadTottus(OdooDownloadBase):
     def maestra(self):
-        pass
+        modelo = 'x_productos'
+        filtros = []
+        campos = ['x_name','x_studio_stage_id','x_studio_variable_de_marcado','x_studio_tipo_de_envase_opcional']
+        header = ['SKU','Etapa','Variable de marcado','Tipo de envase (opcional)']
+        campos_fk = ['x_studio_stage_id']
+        borrar_truefalse = ['Tipo de envase (opcional)']
+
+        self.getDataFromModel(modelo,filtros,campos,header,campos_fk=campos_fk)
+        self.resultadoBusqueda = self.quitarTrueFalse(self.resultadoBusqueda,borrar_truefalse)
+        self.downloadExcel('Maestra','csv')
+        print('Se ha generado el archivo Maestra.csv')
+    
+    def comunicacion_masiva(self,periodo):
+        # CODIGOS DE ETAPA DE ESTUDIOS
+        no_completado_nuevo = 1
+        no_completado_revision = 2
+        completado = 3
+        proyectado = 4
+        completado_parcial = 5
+
+        # parametros de descarga
+        modelo = 'x_productos'
+        campos = ['x_name','x_studio_equipo','x_studio_descripcion','x_studio_division','x_studio_proveedor','x_studio_actor_relevante','x_studio_trazabilidad_levantamiento','x_studio_stage_id']
+        header = ['SKU','Equipo','Descripción','División','Proveedor','Actor relevante','Trazabilidad levantamiento','Etapa']
+        campos_fk = ['x_studio_equipo','x_studio_division','x_studio_proveedor','x_studio_actor_relevante','x_studio_trazabilidad_levantamiento','x_studio_stage_id']
+        borrar_truefalse = ['Actor relevante/Correo electrónico','Trazabilidad levantamiento']
+
+        filtro1 = ["&",["x_studio_periodos.x_name","=",periodo],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision,proyectado,completado_parcial]]]
+        filtro2 = ["&","&",["x_studio_periodos.x_name","=",periodo],["x_studio_stage_id","=",completado],["x_studio_variable_de_marcado","=",1]]
+        filtro3 = ["&",["x_studio_periodos","=",False],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision,proyectado,completado_parcial]]]
+
+
+        # DESARGAR LAS TABLAS
+        self.getDataFromModel(modelo,filtro1,campos,header=header,campos_fk=campos_fk)
+        self.downloadExcel('temp1',formato='csv')
+        self.getDataFromModel(modelo,filtro2,campos,header=header,campos_fk=campos_fk)
+        self.downloadExcel('temp2',formato='csv')
+        self.getDataFromModel(modelo,filtro3,campos,header=header,campos_fk=campos_fk)
+        self.downloadExcel('temp3',formato='csv')
+
+        # JUNTAR TABLAS
+        f1 = pd.read_csv('temp1.csv')
+        f2 = pd.read_csv('temp2.csv')
+        f3 = pd.read_csv('temp3.csv')
+        f_final = pd.concat([f1,f2,f3],axis=0,ignore_index=1)
+
+
+        # ADJUNTA CORREO
+        actores = self.getDataFromModel('x_actores_relevantes',[],['x_name','x_studio_partner_email'],ret_=True)
+        lista_correos = []                                                              
+        for pm in f_final['Actor relevante']:
+            try:
+                email = actores[actores['x_name']==pm]['x_studio_partner_email'].values[0]
+                lista_correos.append(email)
+            except:
+                lista_correos.append(False)
+        lista_correos = pd.Series(lista_correos)
+        f_final['Actor relevante/Correo electrónico'] = lista_correos
+        f_final = f_final[['SKU','Equipo','Descripción','División','Proveedor','Actor relevante','Actor relevante/Correo electrónico','Trazabilidad levantamiento','Etapa']]
+
+        f_final = self.quitarTrueFalse(f_final,borrar_truefalse)
+        f_final.to_csv('Comunicacion masiva tottus.csv',index=False)
+
+        # BORRAR ARCHIVOS TEMPORALES
+        # os.remove('temp1.csv')
+        # os.remove('temp2.csv')
+        # os.remove('temp3.csv')
+
+        print('Se ha generado el archivo Comunicacion masiva tottus.csv')
+    
+    def declaracion_eye(self,periodo):
+        
+        # =========================
+        # DESCARGAR TABLA DE VENTAS
+        # =========================
+
+        modelo = 'x_unidades_vendidas'
+        filtros = [('x_studio_periodo.x_name','=',periodo)]
+        campos = ['x_studio_producto','x_studio_unidades_vendidas','x_studio_elementos_del_producto']
+        header = ['Producto','Unidades vendidas','lista elementos'] 
+        campos_fk = ['x_studio_producto']
+
+        un_vendidas = self.getDataFromModel(modelo,filtros,campos,header,campos_fk=campos_fk,ret_=True)
+
+        # =============================
+        # CONTAR ELEMENTOS A DESCARGAR
+        # ============================
+        total_elementos = []
+        for i in range(len(un_vendidas)):
+            elementos = eval(un_vendidas['lista elementos'].iloc[i])
+            total_elementos += elementos
+
+        # =======================================
+        # DESCARGAR ELEMENTOS DESDE MATERIALIDAD
+        # =======================================
+        modelo = 'x_materialidad'
+        filtros = [('id','in',total_elementos)]
+        campos = ['x_studio_descripcion','x_name','x_studio_productos_por_envase','x_studio_peso','x_studio_peso_informado','x_studio_material','x_studio_caracteristica_material',
+                'x_studio_definir_otro_opcional','x_studio_caracterstica_retornable','x_studio_caracterstica_reciclable','x_studio_peligrosidad',
+                'x_studio_categoria_elemento','x_studio_sub_categoria_material','x_studio_tipo_de_parte']
+
+        header = ['Descripcion','Elemento del producto','Productos por envase','Peso','Peso informado','Material','Característica del material',
+                'Composición material','Característica retornable','Característica reciclable','Peligrosidad','Categoría elemento',
+                'Sub-categoría material','Tipo de parte']
+        campos_fk = []
+
+        elementos = self.getDataFromModel(modelo,filtros,campos,header=header,campos_fk=campos_fk, ret_=True,drop_id=False)
+        elementos['id'] = elementos['id'].astype('int')
+
+        # ===========================
+        # CREAR TABLA FINAL
+        # ===========================
+        header1 = ['Producto']
+        header2 = ['Descripcion','Elemento del producto','Productos por envase','Peso','Peso informado','Material','Característica del material',
+                'Composición material','Característica retornable','Característica reciclable','Peligrosidad','Categoría elemento',
+                'Sub-categoría material','Tipo de parte']
+        header3 = ['Unidades vendidas']
+        final_header = header1 + header2 + header3
+
+        n_campos = len(final_header)
+        declaracion_eye = np.zeros( (len(total_elementos),n_campos),dtype='object' )
+
+        index_declaracion = 0
+        for i in tqdm(range(len(un_vendidas))):  
+                producto = un_vendidas.iloc[i]['Producto']    
+                lista_elementos = eval(un_vendidas.iloc[i]['lista elementos'])
+                
+                parte1 = np.array([producto]).reshape(-1,1)                            # header1 pero escrito de otra forma
+                parte3 = un_vendidas[header3].iloc[i].to_numpy().reshape(1,-1)
+            
+                for elemento in lista_elementos:
+                    detalle_elemento = elementos[ elementos['id']==elemento ]
+                    detalle_elemento = detalle_elemento[header2].to_numpy().reshape(1,-1)
+                    row_declaracion = np.concatenate([parte1,detalle_elemento,parte3],axis=1)
+
+                    declaracion_eye[index_declaracion] = row_declaracion                # ANADE EL ELEMENTO A LA TABLA FINAL
+                    index_declaracion += 1
+
+        declaracion_eye = pd.DataFrame(data=declaracion_eye,columns=final_header)
+        declaracion_eye = declaracion_eye[(declaracion_eye['Categoría elemento']=='EYE Domiciliario') | (declaracion_eye['Categoría elemento']=='EYE No domiciliario')]
+        declaracion_eye = declaracion_eye.replace('False','')
+
+         # ==================================                        
+        # CALCULO DE PESO*UNIDADES VENDIDAS
+        # ==================================
+
+        declaracion_eye['Peso']=declaracion_eye['Peso'].astype('float')
+        declaracion_eye['Unidades vendidas']=declaracion_eye['Unidades vendidas'].astype('float')
+
+        declaracion_eye['Peso total (gr)'] = declaracion_eye['Unidades vendidas']*declaracion_eye['Peso']
+        declaracion_eye['Peso total (kg)'] = 1e-3*declaracion_eye['Unidades vendidas']*declaracion_eye['Peso']
+        declaracion_eye['Peso total (ton)'] = 1e-6*declaracion_eye['Unidades vendidas']*declaracion_eye['Peso']
+
+        # ==================================                        
+        # DESCARGAR
+        # ==================================
+        self.resultadoBusqueda = declaracion_eye
+        self.downloadExcel(f'Declaracion_eye_smk_tottus','xlsx')
