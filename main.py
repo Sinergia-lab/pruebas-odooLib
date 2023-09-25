@@ -1,4 +1,5 @@
 from OddoDownload import OdooDownloadCenco,OdooDownloadCorona,OdooDownloadTottus
+from entregableEye import entregable_declaracion_eye
 
 # ==============================================
 # ============= GENERAR CONEXION ===============
@@ -35,8 +36,8 @@ odoo_tottus = OdooDownloadTottus(conn_params_tottus)
 
 # ======================= DESCARGA PREDEFINIDA: DESCOMENTAR LA LINEA CORRESPONDIENTE
 # odoo_cenco.maestra('SMK')
-# odoo_cenco.comunicacion_masiva(2023,'SMK')
-# odoo_cenco.declaracion_eye('JUMBO',2023)
+# odoo_cenco.comunicacion_masiva(2023,'SMK') #
+odoo_cenco.declaracion_eye('TXD',2023) # JUMBO SISA MDH TXD
 
 
 # odoo_corona.maestra()
@@ -46,4 +47,10 @@ odoo_tottus = OdooDownloadTottus(conn_params_tottus)
 
 # odoo_tottus.maestra()
 # odoo_tottus.comunicacion_masiva(2023)
-odoo_tottus.declaracion_eye(2023)
+# odoo_tottus.declaracion_eye(2023)
+
+# ==============================================
+# ========= GENERAR ENTREGABLE EYE =============
+# ==============================================
+
+# entregable_declaracion_eye('JUMBO') # TXD,MDH,JUMBO,SISA,CORONA,TOTTUS

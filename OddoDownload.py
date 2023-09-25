@@ -224,22 +224,38 @@ class OdooDownloadCenco(OdooDownloadBase):
         print('Se ha generado el archivo Comunicacion masiva.csv')
 
     def declaracion_eye(self,unidad_negocio,periodo):
-        if unidad_negocio not in ['JUMBO','SISA']:
-            raise Exception('La unidad de negocio debe ser "JUMBO" o "SISA"')
+        if unidad_negocio not in ['JUMBO','SISA','MDH','TXD']:
+            raise Exception('La unidad de negocio debe ser "JUMBO", "SISA", MDH o TXD')
         
+        unidad_negocio_original = None
+
         if unidad_negocio=='JUMBO':
             campos_ventas_totales = ['x_studio_total_conveniencia','x_studio_total_jumbo']
             header_ventas_totales = ['TOTAL CONVENIENCIA','TOTAL JUMBO']
+            unidad_negocio = 'SMK'
+            unidad_negocio_original = 'JUMBO'
+
         elif unidad_negocio=='SISA':
             campos_ventas_totales = ['x_studio_total_sisa']
             header_ventas_totales = ['TOTAL SISA']
+            unidad_negocio = 'SMK'
+            unidad_negocio_original = 'SISA'
+
+
+        elif unidad_negocio=='MDH':
+            campos_ventas_totales=['x_studio_total_easy']
+            header_ventas_totales=['TOTAL EASY']
+        
+        elif unidad_negocio=='TXD':
+            campos_ventas_totales=['x_studio_total_paris']
+            header_ventas_totales=['TOTAL PARIS']
         
         # =========================
         # DESCARGAR TABLA DE VENTAS
         # =========================
         modelo = 'x_ventas'
-        filtros = ['&',('x_studio_unidades_de_negocio','=','SMK'),('x_studio_periodo.x_name','=',periodo)]
-        campos = ['x_studio_sku_unidad_de_negocio','x_studio_descripcin_producto','x_studio_elementos_del_producto'] + campos_ventas_totales
+        filtros = ['&',('x_studio_unidades_de_negocio','=',unidad_negocio),('x_studio_periodo.x_name','=',periodo)]
+        campos = ['x_studio_producto','x_studio_descripcin_producto','x_studio_elementos_del_producto'] + campos_ventas_totales
         header = ['Producto','Producto/Descripción','lista_elementos'] + header_ventas_totales 
         campos_fk = ['x_studio_producto']
 
@@ -306,27 +322,40 @@ class OdooDownloadCenco(OdooDownloadBase):
         # CALCULO DE PESO*UNIDADES VENDIDAS
         # ==================================
 
-        if unidad_negocio=='JUMBO':
+        if unidad_negocio=='SMK' and unidad_negocio_original=='JUMBO':
             declaracion_eye['Peso']=declaracion_eye['Peso'].astype('float')
             declaracion_eye['TOTAL JUMBO']=declaracion_eye['TOTAL JUMBO'].astype('float')
             declaracion_eye['TOTAL CONVENIENCIA']=declaracion_eye['TOTAL CONVENIENCIA'].astype('float')
-
             declaracion_eye['Peso total (gr)'] = (declaracion_eye['TOTAL JUMBO']+declaracion_eye['TOTAL CONVENIENCIA'])*declaracion_eye['Peso']
             declaracion_eye['Peso total (kg)'] = 1e-3*(declaracion_eye['TOTAL JUMBO']+declaracion_eye['TOTAL CONVENIENCIA'])*declaracion_eye['Peso']
             declaracion_eye['Peso total (ton)'] = 1e-6*(declaracion_eye['TOTAL JUMBO']+declaracion_eye['TOTAL CONVENIENCIA'])*declaracion_eye['Peso']
-        elif unidad_negocio=='SISA':
+
+        elif unidad_negocio=='SMK' and unidad_negocio_original=='SISA':
             declaracion_eye['Peso']=declaracion_eye['Peso'].astype('float')
             declaracion_eye['TOTAL SISA']=declaracion_eye['TOTAL SISA'].astype('float')
-
             declaracion_eye['Peso total (gr)'] = declaracion_eye['TOTAL SISA']*declaracion_eye['Peso']
             declaracion_eye['Peso total (kg)'] = 1e-3*declaracion_eye['TOTAL SISA']*declaracion_eye['Peso']
             declaracion_eye['Peso total (ton)'] = 1e-6*declaracion_eye['TOTAL SISA']*declaracion_eye['Peso']
+
+        elif unidad_negocio=='MDH':
+            declaracion_eye['Peso']=declaracion_eye['Peso'].astype('float')
+            declaracion_eye['TOTAL EASY']=declaracion_eye['TOTAL EASY'].astype('float')
+            declaracion_eye['Peso total (gr)'] = declaracion_eye['TOTAL EASY']*declaracion_eye['Peso']
+            declaracion_eye['Peso total (kg)'] = 1e-3*declaracion_eye['TOTAL EASY']*declaracion_eye['Peso']
+            declaracion_eye['Peso total (ton)'] = 1e-6*declaracion_eye['TOTAL EASY']*declaracion_eye['Peso']
+
+        elif unidad_negocio=='TXD':
+            declaracion_eye['Peso']=declaracion_eye['Peso'].astype('float')
+            declaracion_eye['TOTAL PARIS']=declaracion_eye['TOTAL PARIS'].astype('float')
+            declaracion_eye['Peso total (gr)'] = declaracion_eye['TOTAL PARIS']*declaracion_eye['Peso']
+            declaracion_eye['Peso total (kg)'] = 1e-3*declaracion_eye['TOTAL PARIS']*declaracion_eye['Peso']
+            declaracion_eye['Peso total (ton)'] = 1e-6*declaracion_eye['TOTAL PARIS']*declaracion_eye['Peso']
             
         # ==================================                        
         # DESCARGAR
         # ==================================
         self.resultadoBusqueda = declaracion_eye
-        self.downloadExcel(f'Declaracion_eye_smk_{unidad_negocio}','xlsx')
+        self.downloadExcel(f'Declaracion_eye_{unidad_negocio}','xlsx')
 
 class OdooDownloadCorona(OdooDownloadBase):
 
@@ -425,33 +454,21 @@ class OdooDownloadCorona(OdooDownloadBase):
 
         modelo = 'x_unidades_vendidas'
         filtros = [('x_studio_periodo.x_name','=',periodo)]
-        campos = ['x_studio_producto','x_studio_total_venta']
-        header = ['Producto','Total venta'] 
+        campos = ['x_studio_producto','x_studio_total_venta','x_studio_elementos_del_producto']
+        header = ['Producto','Total venta','lista elementos'] 
         campos_fk = ['x_studio_producto']
 
         un_vendidas = self.getDataFromModel(modelo,filtros,campos,header,campos_fk=campos_fk,ret_=True)
-        
-        # =========================
-        # DESCARGAR PRODUCTOS
-        # =========================
-
-        prods_vendidos =  un_vendidas['Producto'].to_list()
-
-        modelo = 'x_productos'
-        filtros = [('x_name','in',prods_vendidos)]
-        campos = ['x_name','x_studio_todas_las_partes']
-        header = ['Codigo spp','lista elementos'] 
-        campos_fk = []
-
-        productos = self.getDataFromModel(modelo,filtros,campos,header=header,ret_=True)
+ 
 
         # =============================
         # CONTAR ELEMENTOS A DESCARGAR
         # ============================
         total_elementos = []
-        for i in range(len(productos)):
-            elementos = eval(productos['lista elementos'].iloc[i])
+        for i in range(len(un_vendidas)):
+            elementos = eval(un_vendidas['lista elementos'].iloc[i])
             total_elementos += elementos
+            
         # =======================================
         # DESCARGAR ELEMENTOS NESDE MATERIALIDAD
         # =======================================
@@ -467,6 +484,7 @@ class OdooDownloadCorona(OdooDownloadBase):
         campos_fk = ['x_studio_producto']
 
         elementos = self.getDataFromModel(modelo,filtros,campos,header=header,campos_fk=campos_fk, ret_=True,drop_id=False)
+        elementos['id'] = elementos['id'].astype('int')
         
         # ===========================
         # CREAR TABLA FINAL
@@ -486,11 +504,10 @@ class OdooDownloadCorona(OdooDownloadBase):
         for i in tqdm(range(len(un_vendidas))):                                      # POR CADA FILA EN VENTAS (tabla x_ventas)
             parte1 = un_vendidas[header1].iloc[i].to_numpy().reshape(1,-1)  
             parte3 = un_vendidas[header3].iloc[i].to_numpy().reshape(1,-1)
-            producto = un_vendidas.iloc[i]['Producto']
-            lista_elementos = eval(productos[productos['Codigo spp']==producto]['lista elementos'].iloc[0])
+            lista_elementos = eval(un_vendidas.iloc[i]['lista elementos'])
 
             for elemento in lista_elementos:
-                detalle_elemento = elementos[ elementos['id']==str(elemento) ]
+                detalle_elemento = elementos[ elementos['id']==elemento ]
                 detalle_elemento = detalle_elemento[header2].to_numpy().reshape(1,-1)
                 row_declaracion = np.concatenate([parte1,detalle_elemento,parte3],axis=1)
 
@@ -520,7 +537,6 @@ class OdooDownloadCorona(OdooDownloadBase):
         declaracion_eye = self.quitarTrueFalse(declaracion_eye,campos_false)
         self.resultadoBusqueda = declaracion_eye
         self.downloadExcel(f'Declaracion_eye_corona','xlsx')
-
 
 class OdooDownloadTottus(OdooDownloadBase):
     def maestra(self):
@@ -628,7 +644,7 @@ class OdooDownloadTottus(OdooDownloadBase):
         header = ['Descripcion','Elemento del producto','Productos por envase','Peso','Peso informado','Material','Característica del material',
                 'Composición material','Característica retornable','Característica reciclable','Peligrosidad','Categoría elemento',
                 'Sub-categoría material','Tipo de parte']
-        campos_fk = []
+        campos_fk = ['x_studio_material']
 
         elementos = self.getDataFromModel(modelo,filtros,campos,header=header,campos_fk=campos_fk, ret_=True,drop_id=False)
         elementos['id'] = elementos['id'].astype('int')
@@ -681,4 +697,14 @@ class OdooDownloadTottus(OdooDownloadBase):
         # DESCARGAR
         # ==================================
         self.resultadoBusqueda = declaracion_eye
-        self.downloadExcel(f'Declaracion_eye_smk_tottus','xlsx')
+        self.downloadExcel(f'Declaracion_eye_tottus','xlsx')
+
+class OdooDownloadDimerc(OdooDownloadBase):
+    def maestra(self):
+        pass
+
+    def comunicacion_masiva(self,periodo):
+        pass
+
+    def declaracion_eye(self,periodo):
+        pass
