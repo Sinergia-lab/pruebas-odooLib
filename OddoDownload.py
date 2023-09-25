@@ -97,6 +97,15 @@ class OdooDownloadBase:
         print('done')
 
         # SET HEADER
+        # combinacion = (header is not None, len(lista_campos)!=0, 'id' in lista_campos)  # Hay header, hay campos, se solicita el id
+        # if combinacion == (0,1,0):  header=['id'] + lista_campos
+        # elif combinacion==(0,1,1):  header=lista_campos
+        # elif combinacion==(1,1,0):  header=['id']+header
+        # elif combinacion==(1,1,1):  header=header
+        # else:
+        #     raise Exception('La combinancion de header, campos y id no permite calcular el tamano correcto del header')
+
+        # SET HEADER
         if not header and len(lista_campos):    header = ['id'] + lista_campos      # NO HAY HEADER PERO HAY LISTA DE CAMPOS
         elif not header:                        header = res[0].keys()              # NO HAY NI HEADER NI LISTA DE CAMPOS
         else:                                   header = ['id'] + header            # HAY HEADER
@@ -134,12 +143,12 @@ class OdooDownloadBase:
             
     def quitarTrueFalse(self,df,campos,to_replace=''):
         for campo in campos:
-            df[campo] = df[campo].replace('True',to_replace)
+            df[campo] = df[campo].replace(False,to_replace)
             df[campo] = df[campo].replace('False',to_replace)
         return df
-    # ============================
-    # PLANTILLAS PREDEFINIDAS
-    # ============================
+# ============================
+# PLANTILLAS PREDEFINIDAS
+# ============================
 
 class OdooDownloadCenco(OdooDownloadBase):
     def maestra(self,unidad_negocio):
@@ -152,6 +161,10 @@ class OdooDownloadCenco(OdooDownloadBase):
         Returns:
         - Ninguno: El documento generado se guarda como variable dentro del objeto odooDownload
         """
+
+        if unidad_negocio not in ['JUMBO','SISA','MDH','TXD']:
+            raise Exception('La unidad de negocio debe ser "JUMBO", "SISA", MDH o TXD')
+
         modelo = 'x_productos'
         filtros = [('x_studio_unidades_de_negocio','=',unidad_negocio)]
         campos = ['x_studio_sku_unidad_de_negocio','x_name','x_studio_stage_id','x_studio_variable_de_marcado','x_studio_candidato_a_analisis_fisico']
@@ -174,6 +187,9 @@ class OdooDownloadCenco(OdooDownloadBase):
         Returns:
         - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
         """
+
+        if unidad_negocio not in ['JUMBO','SISA','MDH','TXD']:
+            raise Exception('La unidad de negocio debe ser "JUMBO", "SISA", MDH o TXD')
 
         # PARAMETROS
         filtro1 = ["&","&",["x_studio_periodos.x_name","=",anho],["x_studio_unidades_de_negocio","=",unidad_negocio],"|",["x_studio_stage_id","=",2],["x_studio_stage_id","=",5]]
@@ -604,9 +620,9 @@ class OdooDownloadTottus(OdooDownloadBase):
         f_final.to_csv('Comunicacion masiva tottus.csv',index=False)
 
         # BORRAR ARCHIVOS TEMPORALES
-        # os.remove('temp1.csv')
-        # os.remove('temp2.csv')
-        # os.remove('temp3.csv')
+        os.remove('temp1.csv')
+        os.remove('temp2.csv')
+        os.remove('temp3.csv')
 
         print('Se ha generado el archivo Comunicacion masiva tottus.csv')
     
@@ -700,11 +716,197 @@ class OdooDownloadTottus(OdooDownloadBase):
         self.downloadExcel(f'Declaracion_eye_tottus','xlsx')
 
 class OdooDownloadDimerc(OdooDownloadBase):
-    def maestra(self):
-        pass
+   
+    def maestra(self,unidad_negocio):
 
-    def comunicacion_masiva(self,periodo):
-        pass
+        if unidad_negocio not in ['DIMERC','PRONOBEL','DIMEIGGS']:
+            raise Exception('La unidad de negocios debe ser DIMERC, PRONOBEL o DIMEIGGS')
 
-    def declaracion_eye(self,periodo):
-        pass
+        modelo = 'x_productos'
+        filtros = [('x_studio_unidades_de_negocio','=',unidad_negocio)]
+        campos = ['x_name','x_studio_stage_id','x_studio_levantamiento_asalvo']
+        header = ['SKU','Etapa','Levantamiento ASALVO']
+        campos_fk = ['x_studio_stage_id']
+
+        self.getDataFromModel(modelo,filtros,campos,header,campos_fk=campos_fk)
+        self.downloadExcel('Maestra dimerc','csv')
+
+    def comunicacion_masiva(self,periodo,unidad_negocio):
+
+        if unidad_negocio not in ['DIMERC','PRONOBEL','DIMEIGGS']:
+            raise Exception('La unidad de negocio debe ser DIMERC, PRONOBEL o DIMEIGGS')
+
+        no_completado_nuevo = 1
+        no_completado_revision = 2
+        completado = 3
+
+        filtro1 = ["&","&",["x_studio_periodo.x_name","=",periodo],["x_studio_unidades_de_negocio","=",unidad_negocio],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision]]]
+        filtro2 = ["&","&","&",["x_studio_periodo.x_name","=",periodo],["x_studio_unidades_de_negocio","=",unidad_negocio],["x_studio_stage_id","=",completado],["x_studio_levantamiento_asalvo","=",1]]
+        filtro3 = ["&","&",["x_studio_periodo","=",False],["x_studio_unidades_de_negocio","=",unidad_negocio],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision]]]
+
+        campos = ['x_name','x_studio_equipo','x_studio_descripcion','x_studio_linea','x_studio_proveedor','x_studio_ean',
+                  'x_studio_actor_relevante','x_studio_trazabilidad_levantamiento','x_studio_stage_id']
+        modelo = 'x_productos'
+        header = ['SKU','Equipo','Descripción','Línea','Proveedor','EAN','Actor relevante','Trazabilidad levantamiento','Etapa']
+        campos_fk = ['x_studio_linea','x_studio_proveedor','x_studio_actor_relevante','x_studio_trazabilidad_levantamiento','x_studio_stage_id']
+        borrar_truefalse = ['Equipo','Proveedor','Trazabilidad levantamiento','EAN','Actor relevante','Actor relevante/Correo electrónico']
+
+        # DESARGAR LAS TABLAS
+        self.getDataFromModel(modelo,filtro1,campos,header=header,campos_fk=campos_fk)
+        self.downloadExcel('temp1',formato='csv')
+        self.getDataFromModel(modelo,filtro2,campos,header=header,campos_fk=campos_fk)
+        self.downloadExcel('temp2',formato='csv')
+        self.getDataFromModel(modelo,filtro3,campos,header=header,campos_fk=campos_fk)
+        self.downloadExcel('temp3',formato='csv')
+
+        # JUNTAR TABLAS
+        f1 = pd.read_csv('temp1.csv')
+        f2 = pd.read_csv('temp2.csv')
+        f3 = pd.read_csv('temp3.csv')
+        f_final = pd.concat([f1,f2,f3],axis=0,ignore_index=1)
+
+        # ADJUNTA CORREO
+        actores = self.getDataFromModel('x_actores_relevantes',[],['x_name','x_studio_partner_email'],ret_=True)
+        lista_correos = []                                                              
+        for pm in f_final['Actor relevante']:
+            try:
+                email = actores[actores['x_name']==pm]['x_studio_partner_email'].values[0]
+                lista_correos.append(email)
+            except:
+                lista_correos.append(False)
+        lista_correos = pd.Series(lista_correos)
+        f_final['Actor relevante/Correo electrónico'] = lista_correos
+        f_final = f_final[['SKU','Equipo','Descripción','Línea','Proveedor','EAN','Actor relevante','Actor relevante/Correo electrónico','Trazabilidad levantamiento','Etapa']]
+
+        f_final = self.quitarTrueFalse(f_final,borrar_truefalse)
+        f_final.to_csv(f'Comunicacion masiva dimerc-{unidad_negocio}.csv',index=False)
+
+        # BORRAR ARCHIVOS TEMPORALES
+        os.remove('temp1.csv')
+        os.remove('temp2.csv')
+        os.remove('temp3.csv')
+
+        print(f'Se ha generado el archivo Comunicacion masiva dimerc-{unidad_negocio}.csv')
+
+    def declaracion_eye(self,periodo,unidad_negocio):
+        if unidad_negocio not in ['DIMERC','PRONOBEL','DIMEIGGS']:
+            raise Exception('La unidad de negocio debe ser DIMERC, PRONOBEL o DIMEIGGS')
+                
+
+        # =========================
+        # DESCARGAR TABLA DE VENTAS
+        # =========================
+
+        if unidad_negocio=='DIMERC':
+            campos_ventas_totales = ['x_studio_unidades_vendidas_dimerc']
+            header_ventas_totales = ['Unidades vendidas Dimerc']
+
+        elif unidad_negocio=='PRONOBEL':
+            campos_ventas_totales = ['x_studio_unidades_vendidas_pronobel']
+            header_ventas_totales = ['Unidades Vendidas Pronobel']
+
+        elif unidad_negocio=='DIMEIGGS':
+            campos_ventas_totales = ['x_studio_unidades_vendidas_dimeiggs']
+            header_ventas_totales = ['Unidades Vendidas Dimeiggs']
+
+
+        # =========================
+        # DESCARGAR TABLA DE VENTAS
+        # =========================
+        modelo = 'x_unidades_vendidas'
+        filtros = [('x_studio_periodo_1.x_name','=',periodo)]
+        campos = ['x_studio_producto','x_studio_todos_los_elementos'] + campos_ventas_totales
+        header = ['Producto','lista_elementos'] + header_ventas_totales 
+        campos_fk = ['x_studio_producto']
+
+        ventas = self.getDataFromModel(modelo,filtros,campos,ret_=True,campos_fk=campos_fk, header=header)
+
+        # =============================
+        # CONTAR ELEMENTOS A DESCARGAR
+        # =============================
+        total_elementos = []
+        for i in range(len(ventas)):
+            elementos = eval(ventas['lista_elementos'].iloc[i])
+            total_elementos += elementos
+        
+        # ===========================
+        # DESCARGAR DETALLE DE PARTES
+        # ===========================
+        modelo = 'x_materialidad'
+        filtros = [("id","in",total_elementos)]
+        campos = ['x_name','x_studio_productos_por_envase','x_studio_peso','x_studio_peso_informado','x_studio_material','x_studio_caracteristica_material',
+                    'x_studio_definir_otro_opcional','x_studio_caracteristica_retornable','x_studio_caracterstica_reciclable','x_studio_peligrosidad',
+                    'x_studio_categoria_elemento','x_studio_sub_categoria_material','x_studio_tipo_de_parte']
+
+        header = ['Elemento del producto','Productos por envase','Peso','Peso informado','Material','Característica del material',
+                    'Definir otro (opcional)','Característica retornable','Característica reciclable','Peligrosidad','Categoría elemento',
+                    'Sub-categoría material','Tipo de parte']
+
+        campos_fk = ['x_studio_material']
+
+        materialidad = self.getDataFromModel(modelo,filtros,campos,ret_=True,drop_id=False,campos_fk=campos_fk,header=header)
+        materialidad['id'] = pd.to_numeric(materialidad['id'], errors='coerce')
+
+        # ===========================
+        # CREAR TABLA FINAL
+        # ===========================
+
+        header_1 = ['Producto']
+        header_2 = ['Elemento del producto','Productos por envase','Peso','Peso informado','Material','Característica del material',
+                    'Definir otro (opcional)','Característica retornable','Característica reciclable','Peligrosidad','Categoría elemento',
+                    'Sub-categoría material','Tipo de parte']
+        header_3 = header_ventas_totales
+        final_header = header_1+header_2+header_3
+
+        n_campos = len(final_header)
+        declaracion_eye = np.zeros( (len(total_elementos),n_campos),dtype='object' )
+
+        index_declaracion = 0
+        for i in tqdm(range(len(ventas))):                                      # POR CADA FILA EN VENTAS (tabla x_ventas)
+            lista_elementos = eval(ventas.iloc[i].lista_elementos)              # OBTENGO LOS ELEMENTOS (o partes xd)              
+            parte1 = ventas[header_1].iloc[i].to_numpy().reshape(1,-1)  
+            parte3 = ventas[header_3].iloc[i].to_numpy().reshape(1,-1)
+
+            for elemento in lista_elementos:                                    # POR CADA PARTE
+                detalle_elemento = materialidad[ materialidad['id']==elemento ]
+                detalle_elemento = detalle_elemento[header_2].to_numpy().reshape(1,-1)
+                row_declaracion = np.concatenate([parte1,detalle_elemento,parte3],axis=1)
+
+                declaracion_eye[index_declaracion] = row_declaracion            # ANADE EL ELEMENTO A LA TABLA FINAL
+                index_declaracion += 1
+
+        declaracion_eye = pd.DataFrame(data=declaracion_eye,columns=final_header)
+        declaracion_eye = declaracion_eye[(declaracion_eye['Categoría elemento']=='EYE Domiciliario') | (declaracion_eye['Categoría elemento']=='EYE No domiciliario')]
+        declaracion_eye = declaracion_eye.replace('False','')
+
+        # ==================================                        
+        # CALCULO DE PESO*UNIDADES VENDIDAS
+        # ==================================
+
+        if unidad_negocio=='DIMERC':        campo_vendidas = 'Unidades vendidas Dimerc'
+        elif unidad_negocio=='PRONOBEL':    campo_vendidas = 'Unidades Vendidas Pronobel'
+        elif unidad_negocio=='DIMEIGGS':    campo_vendidas = 'Unidades Vendidas Dimeiggs'
+
+        declaracion_eye['Peso']=declaracion_eye['Peso'].astype('float')
+        declaracion_eye[campo_vendidas]=declaracion_eye[campo_vendidas].astype('float')
+        declaracion_eye['Peso total (gr)'] = declaracion_eye[campo_vendidas]*declaracion_eye['Peso']
+        declaracion_eye['Peso total (kg)'] = 1e-3*declaracion_eye[campo_vendidas]*declaracion_eye['Peso']
+        declaracion_eye['Peso total (ton)'] = 1e-6*declaracion_eye[campo_vendidas]*declaracion_eye['Peso']
+
+        # ==================================                        
+        # DESCARGAR
+        # ==================================
+        self.resultadoBusqueda = declaracion_eye
+        self.downloadExcel(f'Declaracion_eye_{unidad_negocio}','xlsx')
+
+class OdooDownloadIansa(OdooDownloadBase):
+
+    def maestra(self,unidad_negocio):
+        modelo = 'x_productos'
+        filtros = [('x_studio_razn_social','=',unidad_negocio)]
+        campos = ['x_name','x_studio_stage_id']
+        header = ['SKU','Etapa']
+        campos_fk = ['x_studio_stage_id']
+
+        self.getDataFromModel(modelo,filtros,campos,header,campos_fk=campos_fk)
+        self.downloadExcel('Maestra Iansa','csv')
