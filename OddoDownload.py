@@ -242,7 +242,10 @@ class OdooDownloadCenco(OdooDownloadBase):
     def declaracion_eye(self,unidad_negocio,periodo):
         if unidad_negocio not in ['JUMBO','SISA','MDH','TXD']:
             raise Exception('La unidad de negocio debe ser "JUMBO", "SISA", MDH o TXD')
-        
+
+        # ===========================
+        # PREPARAR HEADERS ADECUADOS
+        # ===========================        
         unidad_negocio_original = None
 
         if unidad_negocio=='JUMBO':
@@ -793,9 +796,9 @@ class OdooDownloadDimerc(OdooDownloadBase):
             raise Exception('La unidad de negocio debe ser DIMERC, PRONOBEL o DIMEIGGS')
                 
 
-        # =========================
-        # DESCARGAR TABLA DE VENTAS
-        # =========================
+        # ===========================
+        # PREPARAR HEADERS ADECUADOS
+        # ===========================
 
         if unidad_negocio=='DIMERC':
             campos_ventas_totales = ['x_studio_unidades_vendidas_dimerc']
@@ -910,3 +913,94 @@ class OdooDownloadIansa(OdooDownloadBase):
 
         self.getDataFromModel(modelo,filtros,campos,header,campos_fk=campos_fk)
         self.downloadExcel('Maestra Iansa','csv')
+
+    def declaracion_eye(self,periodo,unidad_negocio):
+
+        if unidad_negocio not in ["Agrocomercial IANSA", "IANSA Alimentos", "LDA SPA"]:
+            raise Exception('La unidad de negocio debe ser "Agrocomercial IANSA", "IANSA Alimentos" o "LDA SPA"')
+
+
+        # =========================
+        # DESCARGAR TABLA DE VENTAS
+        # =========================
+        modelo = 'x_unidades_vendidas'
+        filtros = ["&",('x_studio_periodo.x_name','=',periodo),('x_studio_razn_social','=',unidad_negocio)]
+        campos = ['x_studio_producto','x_studio_descripcin','x_studio_todos_los_elementos','x_studio_total_unidades_vendidas']
+        header = ['Producto','Producto/Descripción','lista_elementos','TOTAL Unidades Vendidas'] 
+        campos_fk = ['x_studio_producto']
+
+        ventas = self.getDataFromModel(modelo,filtros,campos,ret_=True,campos_fk=campos_fk, header=header)
+
+        # =============================
+        # CONTAR ELEMENTOS A DESCARGAR
+        # =============================
+        total_elementos = []
+        for i in range(len(ventas)):
+            elementos = eval(ventas['lista_elementos'].iloc[i])
+            total_elementos += elementos
+
+        # ===========================
+        # DESCARGAR DETALLE DE PARTES
+        # ===========================
+        modelo = 'x_materialidad'
+        filtros = [("id","in",total_elementos)]
+        campos = ['x_name','x_studio_productos_por_envase','x_studio_peso','x_studio_peso_informado','x_studio_material',	
+                'x_studio_caracteristica_material','x_studio_definir_otro_opcional','x_studio_caracterstica_retornable','x_studio_caracterstica_reciclable',
+                'x_studio_peligrosidad','x_studio_categoria_elemento','x_studio_sub_categoria_material','x_studio_tipo_de_parte']
+
+        header = ['Elemento del producto','Productos por envase','Peso','Peso informado','Material','Característica del material',
+                'Definir otro (opcional)','Característica retornable','Característica reciclable','Peligrosidad','Categoría elemento',	
+                'Sub-categoría material','Tipo de parte']
+
+        campos_fk = ['x_studio_material']
+
+        materialidad = self.getDataFromModel(modelo,filtros,campos,ret_=True,drop_id=False,campos_fk=campos_fk,header=header)
+        materialidad['id'] = pd.to_numeric(materialidad['id'], errors='coerce')
+
+        # ===========================
+        # CREAR TABLA FINAL
+        # ===========================
+
+        header_1 = ['Producto','Producto/Descripción']
+        header_2 = ['Elemento del producto','Productos por envase','Peso','Peso informado','Material','Característica del material',
+                'Definir otro (opcional)','Característica retornable','Característica reciclable','Peligrosidad','Categoría elemento',	
+                'Sub-categoría material','Tipo de parte']
+        header_3 = ['TOTAL Unidades Vendidas']
+        final_header = header_1+header_2+header_3
+
+        n_campos = len(final_header)
+        declaracion_eye = np.zeros( (len(total_elementos),n_campos),dtype='object' )
+
+        index_declaracion = 0
+        for i in tqdm(range(len(ventas))):                                      # POR CADA FILA EN VENTAS (tabla x_ventas)
+            lista_elementos = eval(ventas.iloc[i].lista_elementos)              # OBTENGO LOS ELEMENTOS (o partes xd)              
+            parte1 = ventas[header_1].iloc[i].to_numpy().reshape(1,-1)  
+            parte3 = ventas[header_3].iloc[i].to_numpy().reshape(1,-1)
+
+            for elemento in lista_elementos:                                    # POR CADA PARTE
+                detalle_elemento = materialidad[ materialidad['id']==elemento ]
+                detalle_elemento = detalle_elemento[header_2].to_numpy().reshape(1,-1)
+                row_declaracion = np.concatenate([parte1,detalle_elemento,parte3],axis=1)
+
+                declaracion_eye[index_declaracion] = row_declaracion            # ANADE EL ELEMENTO A LA TABLA FINAL
+                index_declaracion += 1
+
+        declaracion_eye = pd.DataFrame(data=declaracion_eye,columns=final_header)
+        declaracion_eye = declaracion_eye[(declaracion_eye['Categoría elemento']=='EYE Domiciliario') | (declaracion_eye['Categoría elemento']=='EYE No domiciliario')]
+        declaracion_eye = declaracion_eye.replace('False','')
+
+        # ==================================                        
+        # CALCULO DE PESO*UNIDADES VENDIDAS
+        # ==================================
+
+        declaracion_eye['Peso']=declaracion_eye['Peso'].astype('float')
+        declaracion_eye['TOTAL Unidades Vendidas']=declaracion_eye['TOTAL Unidades Vendidas'].astype('float')
+        declaracion_eye['Peso total (gr)'] = declaracion_eye['TOTAL Unidades Vendidas']*declaracion_eye['Peso']
+        declaracion_eye['Peso total (kg)'] = 1e-3*declaracion_eye['TOTAL Unidades Vendidas']*declaracion_eye['Peso']
+        declaracion_eye['Peso total (ton)'] = 1e-6*declaracion_eye['TOTAL Unidades Vendidas']*declaracion_eye['Peso']
+
+        # ==================================                        
+        # DESCARGAR
+        # ==================================
+        self.resultadoBusqueda = declaracion_eye
+        self.downloadExcel(f'Declaracion_eye_{unidad_negocio}','xlsx')

@@ -68,7 +68,9 @@ odoo_iansa = OdooDownloadIansa(conn_params_iansa)
 # odoo_dimerc.comunicacion_masiva(2023,'PRONOBEL')
 # odoo_dimerc.declaracion_eye(2023,'PRONOBEL')
 
-odoo_iansa.maestra('LDA SPA')                              # "Agrocomercial IANSA", "IANSA Alimentos", "LDA SPA"
+# odoo_iansa.maestra('LDA SPA')                              # "Agrocomercial IANSA", "IANSA Alimentos", "LDA SPA"
+odoo_iansa.declaracion_eye(2023,'LDA SPA')
+
 
 # ==============================================
 # ========= GENERAR ENTREGABLE EYE =============
