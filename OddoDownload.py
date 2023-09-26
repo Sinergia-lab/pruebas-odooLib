@@ -842,8 +842,8 @@ class OdooDownloadDimerc(OdooDownloadBase):
         # =========================
         modelo = 'x_unidades_vendidas'
         filtros = [('x_studio_periodo_1.x_name','=',periodo)]
-        campos = ['x_studio_producto','x_studio_todos_los_elementos'] + campos_ventas_totales
-        header = ['Producto','lista_elementos'] + header_ventas_totales 
+        campos = ['x_studio_producto','x_studio_descripcin','x_studio_todos_los_elementos'] + campos_ventas_totales
+        header = ['Producto','Producto/Descripción','lista_elementos'] + header_ventas_totales 
         campos_fk = ['x_studio_producto']
 
         ventas = self.getDataFromModel(modelo,filtros,campos,ret_=True,campos_fk=campos_fk, header=header)
@@ -878,7 +878,7 @@ class OdooDownloadDimerc(OdooDownloadBase):
         # CREAR TABLA FINAL
         # ===========================
 
-        header_1 = ['Producto']
+        header_1 = ['Producto','Producto/Descripción']
         header_2 = ['Elemento del producto','Productos por envase','Peso','Peso informado','Material','Característica del material',
                     'Definir otro (opcional)','Característica retornable','Característica reciclable','Peligrosidad','Categoría elemento',
                     'Sub-categoría material','Tipo de parte']
@@ -1084,4 +1084,92 @@ class OdooDownloadLuccetti(OdooDownloadBase):
         Returns:
         - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
         """
-        pass
+        # =========================
+        # DESCARGAR TABLA DE VENTAS
+        # =========================
+
+        modelo = 'x_unidades_vendidas'
+        filtros = [('x_studio_periodo.x_name','=',periodo)]
+        campos = ['x_studio_producto','x_studio_descripcin','x_studio_unidades_vendidas','x_studio_todos_los_elementos']
+        header = ['Producto','Producto/Descripción','Unidades vendidas','lista elementos'] 
+        campos_fk = ['x_studio_producto']
+
+        un_vendidas = self.getDataFromModel(modelo,filtros,campos,header,campos_fk=campos_fk,ret_=True)
+
+        # =============================
+        # CONTAR ELEMENTOS A DESCARGAR
+        # ============================
+        total_elementos = []
+        for i in range(len(un_vendidas)):
+            elementos = eval(un_vendidas['lista elementos'].iloc[i])
+            total_elementos += elementos
+        
+        # =======================================
+        # DESCARGAR ELEMENTOS NESDE MATERIALIDAD
+        # =======================================
+        modelo = 'x_materialidad'
+        filtros = [('id','in',total_elementos)]
+        campos = ['x_name','x_studio_cantidades','x_studio_peso','x_studio_peso_informado','x_studio_material','x_studio_caracteristica_material','x_studio_definir_otro_opcional',
+                'x_studio_caracterstica_retornable','x_studio_caracterstica_reciclable','x_studio_peligrosidad','x_studio_categoria_elemento',
+                'x_studio_sub_categoria_material','x_studio_tipo_de_parte']
+
+        header = ['Elemento del producto','Cantidades','Peso','Peso informado','Material','Característica del material','Composición material',
+                'Característica retornable','Característica reciclable','Peligrosidad','Categoría elemento','Sub-categoría material','Tipo de parte']
+
+        campos_fk = ['x_studio_producto','x_studio_material']
+
+        elementos = self.getDataFromModel(modelo,filtros,campos,header=header,campos_fk=campos_fk, ret_=True,drop_id=False)
+        elementos['id'] = elementos['id'].astype('int')
+
+        # ===========================
+        # CREAR TABLA FINAL
+        # ===========================
+
+        header1 = ['Producto','Producto/Descripción'] 
+        header2 = ['Elemento del producto','Cantidades','Peso','Peso informado','Material','Característica del material','Composición material',
+                'Característica retornable','Característica reciclable','Peligrosidad','Categoría elemento','Sub-categoría material','Tipo de parte']
+        header3 = ['Unidades vendidas']
+        final_header = header1 + header2 + header3
+
+        n_campos = len(final_header)
+        declaracion_eye = np.zeros( (len(total_elementos),n_campos),dtype='object' )
+
+        index_declaracion = 0
+        for i in tqdm(range(len(un_vendidas))):                                      # POR CADA FILA EN VENTAS (tabla x_ventas)
+            parte1 = un_vendidas[header1].iloc[i].to_numpy().reshape(1,-1)  
+            parte3 = un_vendidas[header3].iloc[i].to_numpy().reshape(1,-1)
+            lista_elementos = eval(un_vendidas.iloc[i]['lista elementos'])
+
+            for elemento in lista_elementos:
+                detalle_elemento = elementos[ elementos['id']==elemento ]
+                detalle_elemento = detalle_elemento[header2].to_numpy().reshape(1,-1)
+                row_declaracion = np.concatenate([parte1,detalle_elemento,parte3],axis=1)
+
+                declaracion_eye[index_declaracion] = row_declaracion                # ANADE EL ELEMENTO A LA TABLA FINAL
+                index_declaracion += 1
+
+        declaracion_eye = pd.DataFrame(data=declaracion_eye,columns=final_header)
+        declaracion_eye = declaracion_eye[(declaracion_eye['Categoría elemento']=='EYE Domiciliario') | (declaracion_eye['Categoría elemento']=='EYE No domiciliario')]
+
+
+        # ==================================                        
+        # CALCULO DE PESO*UNIDADES VENDIDAS
+        # ==================================
+        declaracion_eye['Peso']=declaracion_eye['Peso'].astype('float')
+        declaracion_eye['Peso informado']=declaracion_eye['Peso informado'].astype('float')
+        declaracion_eye['Unidades vendidas']=declaracion_eye['Unidades vendidas'].astype('float')
+
+        declaracion_eye['Peso total (gr)'] = declaracion_eye['Unidades vendidas']*declaracion_eye['Peso']
+        declaracion_eye['Peso total (kg)'] = 1e-3*declaracion_eye['Unidades vendidas']*declaracion_eye['Peso']
+        declaracion_eye['Peso total (ton)'] = 1e-6*declaracion_eye['Unidades vendidas']*declaracion_eye['Peso']
+
+        # ==================================                        
+        # DESCARGAR
+        # ==================================
+        campos_false = ['Producto/Descripción','Elemento del producto','Peso','Peso informado',
+                'Material','Característica del material','Composición material','Característica reciclable',
+                'Característica retornable','Peligrosidad','Sub-categoría material']
+        declaracion_eye = self.quitarTrueFalse(declaracion_eye,campos_false)
+        self.resultadoBusqueda = declaracion_eye
+        self.downloadExcel(filename,f'Declaracion_eye Corona','xlsx')
+
