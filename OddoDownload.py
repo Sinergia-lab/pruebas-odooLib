@@ -2,7 +2,8 @@ import odoolib
 import pandas as pd
 import numpy as np
 import os
-from tqdm import tqdm
+from Aws import Aws
+
 
 
 class OdooDownloadBase:
@@ -11,6 +12,8 @@ class OdooDownloadBase:
         self.connect()
         self.resultadoBusqueda = None
         self.chunk_size = 50000
+        self.aws = Aws()
+        self.bucket_name = 'hellobucket6'
     
     def connect(self):
         """
@@ -82,9 +85,7 @@ class OdooDownloadBase:
         
         res = None
         offset = 0
-        print('Descargando data desde',modelo)
         while True:
-            print('.')
             res_ = self.getDataChunk( model_conn,lista_filtros,lista_campos,offset,campos_fk )
             
             if type(res) != np.ndarray:  res = res_
@@ -94,7 +95,6 @@ class OdooDownloadBase:
             if len(res_) < self.chunk_size:
                 break
 
-        print('done')
 
         # SET HEADER
         # combinacion = (header is not None, len(lista_campos)!=0, 'id' in lista_campos)  # Hay header, hay campos, se solicita el id
@@ -136,18 +136,23 @@ class OdooDownloadBase:
         
         filename = filename if filename else defaultname
         
-        print('Generando archivo')
-        if formato=='xlsx':     self.resultadoBusqueda.to_excel(f'{filename}.xlsx',index=False)
-        elif formato=='csv':    self.resultadoBusqueda.to_csv(f'{filename}.csv',index=False)
-        else:                   raise Exception('Los formatos de archivo validos son "xlsx" y "csv"')
+        if formato=='xlsx':     
+            self.resultadoBusqueda.to_excel(f'/tmp/{filename}.xlsx',index=False)
+            self.aws.upload_file(f'/tmp/{filename}.xlsx',self.bucket_name)
 
-        print(f'Se ha generado el archivo {filename}.{formato}')
+        elif formato=='csv':    
+            self.resultadoBusqueda.to_csv(f'/tmp/{filename}.csv',index=False)
+            self.aws.upload_file(f'/tmp/{filename}.csv',self.bucket_name)
+
+        else:                   
+            raise Exception('Los formatos de archivo validos son "xlsx" y "csv"')
             
     def quitarTrueFalse(self,df,campos,to_replace=''):
         for campo in campos:
             df[campo] = df[campo].replace(False,to_replace)
             df[campo] = df[campo].replace('False',to_replace)
         return df
+
 # ============================
 # PLANTILLAS PREDEFINIDAS
 # ============================
@@ -321,7 +326,7 @@ class OdooDownloadCenco(OdooDownloadBase):
         declaracion_eye = np.zeros( (len(total_elementos),n_campos),dtype='object' )
 
         index_declaracion = 0
-        for i in tqdm(range(len(ventas))):                                      # POR CADA FILA EN VENTAS (tabla x_ventas)
+        for i in range(len(ventas)):                                      # POR CADA FILA EN VENTAS (tabla x_ventas)
             lista_elementos = eval(ventas.iloc[i].lista_elementos)              # OBTENGO LOS ELEMENTOS (o partes xd)              
             parte1 = ventas[header_1].iloc[i].to_numpy().reshape(1,-1)  
             parte3 = ventas[header_3].iloc[i].to_numpy().reshape(1,-1)
@@ -518,7 +523,7 @@ class OdooDownloadCorona(OdooDownloadBase):
         declaracion_eye = np.zeros( (len(total_elementos),n_campos),dtype='object' )
 
         index_declaracion = 0
-        for i in tqdm(range(len(un_vendidas))):                                      # POR CADA FILA EN VENTAS (tabla x_ventas)
+        for i in range(len(un_vendidas)):                                      # POR CADA FILA EN VENTAS (tabla x_ventas)
             parte1 = un_vendidas[header1].iloc[i].to_numpy().reshape(1,-1)  
             parte3 = un_vendidas[header3].iloc[i].to_numpy().reshape(1,-1)
             lista_elementos = eval(un_vendidas.iloc[i]['lista elementos'])
@@ -692,7 +697,7 @@ class OdooDownloadTottus(OdooDownloadBase):
         declaracion_eye = np.zeros( (len(total_elementos),n_campos),dtype='object' )
 
         index_declaracion = 0
-        for i in tqdm(range(len(un_vendidas))):  
+        for i in range(len(un_vendidas)):  
                 producto = un_vendidas.iloc[i]['Producto']    
                 lista_elementos = eval(un_vendidas.iloc[i]['lista elementos'])
                 
@@ -889,7 +894,7 @@ class OdooDownloadDimerc(OdooDownloadBase):
         declaracion_eye = np.zeros( (len(total_elementos),n_campos),dtype='object' )
 
         index_declaracion = 0
-        for i in tqdm(range(len(ventas))):                                      # POR CADA FILA EN VENTAS (tabla x_ventas)
+        for i in range(len(ventas)):                                      # POR CADA FILA EN VENTAS (tabla x_ventas)
             lista_elementos = eval(ventas.iloc[i].lista_elementos)              # OBTENGO LOS ELEMENTOS (o partes xd)              
             parte1 = ventas[header_1].iloc[i].to_numpy().reshape(1,-1)  
             parte3 = ventas[header_3].iloc[i].to_numpy().reshape(1,-1)
@@ -1016,7 +1021,7 @@ class OdooDownloadIansa(OdooDownloadBase):
         declaracion_eye = np.zeros( (len(total_elementos),n_campos),dtype='object' )
 
         index_declaracion = 0
-        for i in tqdm(range(len(ventas))):                                      # POR CADA FILA EN VENTAS (tabla x_ventas)
+        for i in range(len(ventas)):                                      # POR CADA FILA EN VENTAS (tabla x_ventas)
             lista_elementos = eval(ventas.iloc[i].lista_elementos)              # OBTENGO LOS ELEMENTOS (o partes xd)              
             parte1 = ventas[header_1].iloc[i].to_numpy().reshape(1,-1)  
             parte3 = ventas[header_3].iloc[i].to_numpy().reshape(1,-1)
@@ -1135,7 +1140,7 @@ class OdooDownloadLuccetti(OdooDownloadBase):
         declaracion_eye = np.zeros( (len(total_elementos),n_campos),dtype='object' )
 
         index_declaracion = 0
-        for i in tqdm(range(len(un_vendidas))):                                      # POR CADA FILA EN VENTAS (tabla x_ventas)
+        for i in range(len(un_vendidas)):                                      # POR CADA FILA EN VENTAS (tabla x_ventas)
             parte1 = un_vendidas[header1].iloc[i].to_numpy().reshape(1,-1)  
             parte3 = un_vendidas[header3].iloc[i].to_numpy().reshape(1,-1)
             lista_elementos = eval(un_vendidas.iloc[i]['lista elementos'])
