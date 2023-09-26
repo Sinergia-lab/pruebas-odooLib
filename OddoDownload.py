@@ -120,8 +120,7 @@ class OdooDownloadBase:
         if ret_:        return res
         else:           self.resultadoBusqueda = res
 
-    
-    def downloadExcel(self,ruta,formato='xlsx'):
+    def downloadExcel(self,filename,defaultname,formato='xlsx'):
         """
         Genera el archivo final en el disco duro
 
@@ -133,13 +132,16 @@ class OdooDownloadBase:
         - Ninguno: Se genera un archivo en el disco duro
         """
         if type(self.resultadoBusqueda) != pd.core.frame.DataFrame:
-            print('No se ha descargado ningun modelo o no se encontraron registros')
-            return
+            raise Exception('No se ha descargado ningun modelo o no se encontraron registros')
+        
+        filename = filename if filename else defaultname
         
         print('Generando archivo')
-        if formato=='xlsx':     self.resultadoBusqueda.to_excel(f'{ruta}.xlsx',index=False)
-        elif formato=='csv':    self.resultadoBusqueda.to_csv(f'{ruta}.csv',index=False)
+        if formato=='xlsx':     self.resultadoBusqueda.to_excel(f'{filename}.xlsx',index=False)
+        elif formato=='csv':    self.resultadoBusqueda.to_csv(f'{filename}.csv',index=False)
         else:                   raise Exception('Los formatos de archivo validos son "xlsx" y "csv"')
+
+        print(f'Se ha generado el archivo {filename}.{formato}')
             
     def quitarTrueFalse(self,df,campos,to_replace=''):
         for campo in campos:
@@ -151,19 +153,20 @@ class OdooDownloadBase:
 # ============================
 
 class OdooDownloadCenco(OdooDownloadBase):
-    def maestra(self,unidad_negocio):
+    def maestra(self,unidad_negocio,filename=None):
         """
-        Shortcut con parametros para descargar la tabla Maestra
+        Descarga tabla maestra.
 
         Parametros: 
         - unidad_negocio: Filtro Nombre de la unidad de negocio a descargar
-        
+        - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+         
         Returns:
-        - Ninguno: El documento generado se guarda como variable dentro del objeto odooDownload
+        - Ninguno: Ninguno. Se genera un archivo en el disco duro.
         """
 
-        if unidad_negocio not in ['JUMBO','SISA','MDH','TXD']:
-            raise Exception('La unidad de negocio debe ser "JUMBO", "SISA", MDH o TXD')
+        if unidad_negocio not in ['SMK','MDH','TXD']:
+            raise Exception('La unidad de negocio debe ser SMK, MDH o TXD')
 
         modelo = 'x_productos'
         filtros = [('x_studio_unidades_de_negocio','=',unidad_negocio)]
@@ -174,22 +177,23 @@ class OdooDownloadCenco(OdooDownloadBase):
         
         self.getDataFromModel(modelo,filtros,campos,header,campos_fk=campos_fk)
         self.resultadoBusqueda = self.quitarTrueFalse(self.resultadoBusqueda,borrar_truefalse)
-        self.downloadExcel('Maestra','csv')
-        print('Se ha generado el archivo Maestra.csv')
+        self.downloadExcel(filename,f'Maestra Cenco-{unidad_negocio}','csv')
     
-    def comunicacion_masiva(self,anho,unidad_negocio):
+    def comunicacion_masiva(self,anho,unidad_negocio,filename=None):
         """
-        Descarga la tabla de comunicacion masiva para smk
+        Descarga la tabla de comunicacion masiva.
 
         Parametros:
-        - anho: Periodo que se quiere descargar
+        - anho: Filtro del Periodo que se quiere descargar
+        - unidad_negocio: Filtro Nombre de la unidad de negocio a descargar
+        - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
 
         Returns:
         - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
         """
 
-        if unidad_negocio not in ['JUMBO','SISA','MDH','TXD']:
-            raise Exception('La unidad de negocio debe ser "JUMBO", "SISA", MDH o TXD')
+        if unidad_negocio not in ['SMK','MDH','TXD']:
+            raise Exception('La unidad de negocio debe ser "SMK", MDH o TXD')
 
         # PARAMETROS
         filtro1 = ["&","&",["x_studio_periodos.x_name","=",anho],["x_studio_unidades_de_negocio","=",unidad_negocio],"|",["x_studio_stage_id","=",2],["x_studio_stage_id","=",5]]
@@ -204,11 +208,11 @@ class OdooDownloadCenco(OdooDownloadBase):
 
         # DESCARGA DE TABLAS
         self.getDataFromModel(modelo,filtro1,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp1',formato='csv')
+        self.downloadExcel('temp1',None,formato='csv')
         self.getDataFromModel(modelo,filtro2,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp2',formato='csv')
+        self.downloadExcel('temp2',None,formato='csv')
         self.getDataFromModel(modelo,filtro3,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp3',formato='csv')
+        self.downloadExcel('temp3',None,formato='csv')
 
         # JUNTAR TABLAS
         f1 = pd.read_csv('temp1.csv')
@@ -229,17 +233,27 @@ class OdooDownloadCenco(OdooDownloadBase):
         f_final = f_final[['SKU unidad negocio','Codigo regional','Descripcion','EAN','Proveedor','Equipo','PM asociado','PM asociado/Correo electrónico','Trazabilidad levantamiento','Etapa']]
         
         # LIMPIA TRUE-FALSE Y GUARDA
-        f_final = self.quitarTrueFalse(f_final,borrar_truefalse)
-        f_final.to_csv('Comunicacion masiva.csv',index=False)
+        self.resultadoBusqueda = self.quitarTrueFalse(f_final,borrar_truefalse)
+        self.downloadExcel(filename,f'Comunicacion masiva Cenco-{unidad_negocio}','csv')
 
         # BORRAR ARCHIVOS TEMPORALES
         os.remove('temp1.csv')
         os.remove('temp2.csv')
         os.remove('temp3.csv')
 
-        print('Se ha generado el archivo Comunicacion masiva.csv')
+    def declaracion_eye(self,unidad_negocio,periodo,filename=None):
+        """
+        Descarga la tabla declaracion eye.
 
-    def declaracion_eye(self,unidad_negocio,periodo):
+        Parametros:
+        - anho: Filtro del Periodo que se quiere descargar
+        - unidad_negocio: Filtro Nombre de la unidad de negocio a descargar
+        - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+
+        Returns:
+        - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
+        """
+
         if unidad_negocio not in ['JUMBO','SISA','MDH','TXD']:
             raise Exception('La unidad de negocio debe ser "JUMBO", "SISA", MDH o TXD')
 
@@ -374,11 +388,20 @@ class OdooDownloadCenco(OdooDownloadBase):
         # DESCARGAR
         # ==================================
         self.resultadoBusqueda = declaracion_eye
-        self.downloadExcel(f'Declaracion_eye_{unidad_negocio}','xlsx')
+        self.downloadExcel(filename,f'Declaracion_eye Cenco-{unidad_negocio}','xlsx')
 
 class OdooDownloadCorona(OdooDownloadBase):
 
-    def maestra(self):
+    def maestra(self,filename=None):
+        """
+        Descarga tabla maestra.
+
+        Parametros: 
+        - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+         
+        Returns:
+        - Ninguno: Ninguno. Se genera un archivo en el disco duro.
+        """
         modelo = 'x_productos'
         filtros = []
         campos = ['x_name','x_studio_stage_id']
@@ -389,25 +412,19 @@ class OdooDownloadCorona(OdooDownloadBase):
         self.getDataFromModel(modelo,filtros,campos,header=header,campos_fk=campos_fk)
         self.resultadoBusqueda = self.quitarTrueFalse(self.resultadoBusqueda,borrar_truefalse)
 
-        self.downloadExcel('Maestra','csv')
-        print('Se ha generado el archivo Maestra.csv')
-    
-    def maestra_homologos(self):
-        modelo = 'x_productos'
-        filtros = []
-        campos = ['x_studio_ean','x_studio_estilo_1','x_name','x_studio_url','x_studio_hoja','x_studio_notes']
-        header = ['EAN','Estilo','Name','URL','HOJA','Notas']
-        campos_fk = []
-        borrar_truefalse = ['EAN','Estilo','Name','URL','HOJA','Notas']
+        self.downloadExcel(filename,f'Maestra Corona','csv')
 
-        self.getDataFromModel(modelo,filtros,campos,header=header,campos_fk=campos_fk)
-        self.resultadoBusqueda = self.quitarTrueFalse(self.resultadoBusqueda,borrar_truefalse)
+    def comunicacion_masiva(self,periodo,filename=None):
+        """
+        Descarga la tabla de comunicacion masiva
 
-        self.downloadExcel('Maestra_homologos','csv')
-        print('Se ha generado el archivo Maestra_homologos.csv')        
+        Parametros:
+        - anho: Filtro del Periodo que se quiere descargar
+        - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
 
-    def comunicacion_masiva(self,periodo):
-
+        Returns:
+        - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
+        """
         # CODIGOS DE ETAPA DE ESTUDIOS
         no_completado_nuevo = 1
         no_completado_revision = 2
@@ -429,11 +446,11 @@ class OdooDownloadCorona(OdooDownloadBase):
 
         # DESARGAR LAS TABLAS
         self.getDataFromModel(modelo,filtro1,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp1',formato='csv')
+        self.downloadExcel('temp1',None,formato='csv')
         self.getDataFromModel(modelo,filtro2,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp2',formato='csv')
+        self.downloadExcel('temp2',None,formato='csv')
         self.getDataFromModel(modelo,filtro3,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp3',formato='csv')
+        self.downloadExcel('temp3',None,formato='csv')
 
         # JUNTAR TABLAS
         f1 = pd.read_csv('temp1.csv')
@@ -455,18 +472,25 @@ class OdooDownloadCorona(OdooDownloadBase):
         f_final = f_final[['Name','Estilo','Descripción larga','EAN','Proveedor','PM asociado','PM asociado/Correo electrónico','Trazabilidad levantamiento','Etapa']]
 
         # DESCARGAR EXCEL
-        f_final = self.quitarTrueFalse(f_final,borrar_truefalse)
-        f_final.to_csv('Comunicacion masiva.csv',index=False)
+        self.resultadoBusqueda = self.quitarTrueFalse(f_final,borrar_truefalse)
+        self.downloadExcel(filename,'Comunicacion masiva Corona','csv')
 
         # BORRAR ARCHIVOS TEMPORALES
         os.remove('temp1.csv')
         os.remove('temp2.csv')
         os.remove('temp3.csv')
 
-        print('Se ha generado el archivo Comunicacion masiva.csv')
+    def declaracion_eye(self,periodo,filename=None):
+        """
+        Descarga la tabla declaracion eye.
 
-    def declaracion_eye(self,periodo):
-        
+        Parametros:
+        - anho: Filtro del Periodo que se quiere descargar
+        - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+
+        Returns:
+        - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
+        """        
         # =========================
         # DESCARGAR TABLA DE VENTAS
         # =========================
@@ -555,10 +579,19 @@ class OdooDownloadCorona(OdooDownloadBase):
                 'Caracteristica retornable','Peligrosidad','Categoría','Sub-categoría material']
         declaracion_eye = self.quitarTrueFalse(declaracion_eye,campos_false)
         self.resultadoBusqueda = declaracion_eye
-        self.downloadExcel(f'Declaracion_eye_corona','xlsx')
+        self.downloadExcel(filename,f'Declaracion_eye Corona','xlsx')
 
 class OdooDownloadTottus(OdooDownloadBase):
-    def maestra(self):
+    def maestra(self,filename=None):
+        """
+        Descarga tabla maestra.
+
+        Parametros: 
+        - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+         
+        Returns:
+        - Ninguno: Ninguno. Se genera un archivo en el disco duro.
+        """
         modelo = 'x_productos'
         filtros = []
         campos = ['x_name','x_studio_stage_id','x_studio_variable_de_marcado','x_studio_tipo_de_envase_opcional']
@@ -568,10 +601,19 @@ class OdooDownloadTottus(OdooDownloadBase):
 
         self.getDataFromModel(modelo,filtros,campos,header,campos_fk=campos_fk)
         self.resultadoBusqueda = self.quitarTrueFalse(self.resultadoBusqueda,borrar_truefalse)
-        self.downloadExcel('Maestra','csv')
-        print('Se ha generado el archivo Maestra.csv')
+        self.downloadExcel(filename,'Maestra Tottus','csv')
     
-    def comunicacion_masiva(self,periodo):
+    def comunicacion_masiva(self,periodo,filename=None):
+        """
+        Descarga la tabla de comunicacion masiva.
+
+        Parametros:
+        - anho: Filtro del Periodo que se quiere descargar
+        - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+
+        Returns:
+        - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
+        """
         # CODIGOS DE ETAPA DE ESTUDIOS
         no_completado_nuevo = 1
         no_completado_revision = 2
@@ -593,11 +635,11 @@ class OdooDownloadTottus(OdooDownloadBase):
 
         # DESARGAR LAS TABLAS
         self.getDataFromModel(modelo,filtro1,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp1',formato='csv')
+        self.downloadExcel('temp1',None,formato='csv')
         self.getDataFromModel(modelo,filtro2,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp2',formato='csv')
+        self.downloadExcel('temp2',None,formato='csv')
         self.getDataFromModel(modelo,filtro3,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp3',formato='csv')
+        self.downloadExcel('temp3',None,formato='csv')
 
         # JUNTAR TABLAS
         f1 = pd.read_csv('temp1.csv')
@@ -619,18 +661,25 @@ class OdooDownloadTottus(OdooDownloadBase):
         f_final['Actor relevante/Correo electrónico'] = lista_correos
         f_final = f_final[['SKU','Equipo','Descripción','División','Proveedor','Actor relevante','Actor relevante/Correo electrónico','Trazabilidad levantamiento','Etapa']]
 
-        f_final = self.quitarTrueFalse(f_final,borrar_truefalse)
-        f_final.to_csv('Comunicacion masiva tottus.csv',index=False)
+        self.resultadoBusqueda = self.quitarTrueFalse(f_final,borrar_truefalse)
+        self.downloadExcel(filename,'Comunicacion masiva tottus','csv')
 
         # BORRAR ARCHIVOS TEMPORALES
         os.remove('temp1.csv')
         os.remove('temp2.csv')
         os.remove('temp3.csv')
+  
+    def declaracion_eye(self,periodo,filename=None):
+        """
+        Descarga la tabla declaracion eye.
 
-        print('Se ha generado el archivo Comunicacion masiva tottus.csv')
-    
-    def declaracion_eye(self,periodo):
-        
+        Parametros:
+        - anho: Filtro del Periodo que se quiere descargar
+        - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+
+        Returns:
+        - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
+        """        
         # =========================
         # DESCARGAR TABLA DE VENTAS
         # =========================
@@ -716,12 +765,21 @@ class OdooDownloadTottus(OdooDownloadBase):
         # DESCARGAR
         # ==================================
         self.resultadoBusqueda = declaracion_eye
-        self.downloadExcel(f'Declaracion_eye_tottus','xlsx')
+        self.downloadExcel(filename,'Declaracion_eye Tottus','xlsx')
 
 class OdooDownloadDimerc(OdooDownloadBase):
    
-    def maestra(self,unidad_negocio):
+    def maestra(self,unidad_negocio,filename=None):
+        """
+        Descarga tabla maestra.
 
+        Parametros: 
+        - unidad_negocio: Filtro Nombre de la unidad de negocio a descargar
+        - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+         
+        Returns:
+        - Ninguno: Ninguno. Se genera un archivo en el disco duro.
+        """
         if unidad_negocio not in ['DIMERC','PRONOBEL','DIMEIGGS']:
             raise Exception('La unidad de negocios debe ser DIMERC, PRONOBEL o DIMEIGGS')
 
@@ -732,10 +790,20 @@ class OdooDownloadDimerc(OdooDownloadBase):
         campos_fk = ['x_studio_stage_id']
 
         self.getDataFromModel(modelo,filtros,campos,header,campos_fk=campos_fk)
-        self.downloadExcel('Maestra dimerc','csv')
+        self.downloadExcel(filename,f'Maestra Dimerc-{unidad_negocio}','csv')
 
-    def comunicacion_masiva(self,periodo,unidad_negocio):
+    def comunicacion_masiva(self,periodo,unidad_negocio,filename=None):
+        """
+        Descarga la tabla de comunicacion masiva.
 
+        Parametros:
+        - anho: Filtro del Periodo que se quiere descargar
+        - unidad_negocio: Filtro Nombre de la unidad de negocio a descargar
+        - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+
+        Returns:
+        - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
+        """
         if unidad_negocio not in ['DIMERC','PRONOBEL','DIMEIGGS']:
             raise Exception('La unidad de negocio debe ser DIMERC, PRONOBEL o DIMEIGGS')
 
@@ -756,11 +824,11 @@ class OdooDownloadDimerc(OdooDownloadBase):
 
         # DESARGAR LAS TABLAS
         self.getDataFromModel(modelo,filtro1,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp1',formato='csv')
+        self.downloadExcel('temp1',None,formato='csv')
         self.getDataFromModel(modelo,filtro2,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp2',formato='csv')
+        self.downloadExcel('temp2',None,formato='csv')
         self.getDataFromModel(modelo,filtro3,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp3',formato='csv')
+        self.downloadExcel('temp3',None,formato='csv')
 
         # JUNTAR TABLAS
         f1 = pd.read_csv('temp1.csv')
@@ -781,21 +849,29 @@ class OdooDownloadDimerc(OdooDownloadBase):
         f_final['Actor relevante/Correo electrónico'] = lista_correos
         f_final = f_final[['SKU','Equipo','Descripción','Línea','Proveedor','EAN','Actor relevante','Actor relevante/Correo electrónico','Trazabilidad levantamiento','Etapa']]
 
-        f_final = self.quitarTrueFalse(f_final,borrar_truefalse)
-        f_final.to_csv(f'Comunicacion masiva dimerc-{unidad_negocio}.csv',index=False)
+        self.resultadoBusqueda = self.quitarTrueFalse(f_final,borrar_truefalse)
+        self.downloadExcel(filename,f'Comunicacion masiva Dimerc-{unidad_negocio}','csv')
 
         # BORRAR ARCHIVOS TEMPORALES
         os.remove('temp1.csv')
         os.remove('temp2.csv')
         os.remove('temp3.csv')
 
-        print(f'Se ha generado el archivo Comunicacion masiva dimerc-{unidad_negocio}.csv')
+    def declaracion_eye(self,periodo,unidad_negocio,filename=None):
+        """
+        Descarga la tabla declaracion eye.
 
-    def declaracion_eye(self,periodo,unidad_negocio):
+        Parametros:
+        - anho: Filtro del Periodo que se quiere descargar
+        - unidad_negocio: Filtro Nombre de la unidad de negocio a descargar
+        - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+
+        Returns:
+        - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
+        """
         if unidad_negocio not in ['DIMERC','PRONOBEL','DIMEIGGS']:
             raise Exception('La unidad de negocio debe ser DIMERC, PRONOBEL o DIMEIGGS')
                 
-
         # ===========================
         # PREPARAR HEADERS ADECUADOS
         # ===========================
@@ -900,11 +976,21 @@ class OdooDownloadDimerc(OdooDownloadBase):
         # DESCARGAR
         # ==================================
         self.resultadoBusqueda = declaracion_eye
-        self.downloadExcel(f'Declaracion_eye_{unidad_negocio}','xlsx')
+        self.downloadExcel(filename,f'Declaracion_eye Dimerc-{unidad_negocio}','xlsx')
 
 class OdooDownloadIansa(OdooDownloadBase):
 
-    def maestra(self,unidad_negocio):
+    def maestra(self,unidad_negocio,filename=None):
+        """
+        Descarga tabla maestra.
+
+        Parametros: 
+        - unidad_negocio: Filtro Nombre de la unidad de negocio a descargar
+        - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+         
+        Returns:
+        - Ninguno: Ninguno. Se genera un archivo en el disco duro.
+        """
         modelo = 'x_productos'
         filtros = [('x_studio_razn_social','=',unidad_negocio)]
         campos = ['x_name','x_studio_stage_id']
@@ -912,13 +998,23 @@ class OdooDownloadIansa(OdooDownloadBase):
         campos_fk = ['x_studio_stage_id']
 
         self.getDataFromModel(modelo,filtros,campos,header,campos_fk=campos_fk)
-        self.downloadExcel('Maestra Iansa','csv')
+        self.downloadExcel(filename,f'Maestra Iansa-{unidad_negocio}','csv')
 
-    def declaracion_eye(self,periodo,unidad_negocio):
+    def declaracion_eye(self,periodo,unidad_negocio,filename=None):
+        """
+        Descarga la tabla declaracion eye.
+
+        Parametros:
+        - anho: Filtro del Periodo que se quiere descargar
+        - unidad_negocio: Filtro Nombre de la unidad de negocio a descargar
+        - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+
+        Returns:
+        - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
+        """        
 
         if unidad_negocio not in ["Agrocomercial IANSA", "IANSA Alimentos", "LDA SPA"]:
             raise Exception('La unidad de negocio debe ser "Agrocomercial IANSA", "IANSA Alimentos" o "LDA SPA"')
-
 
         # =========================
         # DESCARGAR TABLA DE VENTAS
@@ -1003,4 +1099,41 @@ class OdooDownloadIansa(OdooDownloadBase):
         # DESCARGAR
         # ==================================
         self.resultadoBusqueda = declaracion_eye
-        self.downloadExcel(f'Declaracion_eye_{unidad_negocio}','xlsx')
+        self.downloadExcel(filename,f'Declaracion_eye Iansa-{unidad_negocio}','xlsx')
+
+class OdooDownloadLuccetti(OdooDownloadBase):
+    def maestra(self,filename=None):
+        """
+        Descarga tabla maestra.
+
+        Parametros: 
+        - unidad_negocio: Filtro Nombre de la unidad de negocio a descargar
+        - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+         
+        Returns:
+        - Ninguno: Ninguno. Se genera un archivo en el disco duro.
+        """
+        modelo = 'x_productos'
+        filtros = []
+        campos = ['x_name','x_studio_stage_id']
+        header = ['Name','Etapa']
+        campos_fk = ['x_studio_stage_id']
+        borrar_truefalse = ['Name']
+
+        self.getDataFromModel(modelo,filtros,campos,header=header,campos_fk=campos_fk)
+        self.resultadoBusqueda = self.quitarTrueFalse(self.resultadoBusqueda,borrar_truefalse)
+
+        self.downloadExcel(filename,f'Maestra Luccetti','csv')
+
+    def declaracion_eye(self,periodo,filename=None):
+        """
+        Descarga la tabla declaracion eye.
+
+        Parametros:
+        - anho: Filtro del Periodo que se quiere descargar
+        - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+
+        Returns:
+        - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
+        """
+        
