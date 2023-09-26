@@ -59,26 +59,26 @@ odoo_luccetti = OdooDownloadLuccetti(conn_params_luccetti)
 
 # ======================= DESCARGA PREDEFINIDA: DESCOMENTAR LA LINEA CORRESPONDIENTE
 # odoo_cenco.maestra('SMK')                     # SMK MDH TXD
-# odoo_cenco.comunicacion_masiva(2023,'SMK') 
+odoo_cenco.comunicacion_masiva(2023,'SMK') 
 # odoo_cenco.declaracion_eye('JUMBO',2023)        # JUMBO SISA MDH TXD
 
 # odoo_corona.maestra()
 # odoo_corona.maestra_homologos()
-# odoo_corona.comunicacion_masiva(2023,filename='Ejemplo corona')
+odoo_corona.comunicacion_masiva(2023,filename='Ejemplo corona')
 # odoo_corona.declaracion_eye(2023)
 
 # odoo_tottus.maestra(filename='Ejemplo tottus')
-# odoo_tottus.comunicacion_masiva(2023)
+odoo_tottus.comunicacion_masiva(2023)
 # odoo_tottus.declaracion_eye(2023)
 
 # odoo_dimerc.maestra('DIMERC')                           # DIMERC, PRONOBEL o DIMEIGGS
-# odoo_dimerc.comunicacion_masiva(2023,'PRONOBEL')
+odoo_dimerc.comunicacion_masiva(2023,'PRONOBEL')
 # odoo_dimerc.declaracion_eye(2023,'PRONOBEL')
 
 # odoo_iansa.maestra('LDA SPA')                              # "Agrocomercial IANSA", "IANSA Alimentos", "LDA SPA"
 # odoo_iansa.declaracion_eye(2023,'LDA SPA')
 
-odoo_luccetti.maestra()
+# odoo_luccetti.maestra()
 
 # ==============================================
 # ========= GENERAR ENTREGABLE EYE =============

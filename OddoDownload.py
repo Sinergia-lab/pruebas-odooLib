@@ -206,19 +206,11 @@ class OdooDownloadCenco(OdooDownloadBase):
         campos_fk = ['x_studio_proveedor','x_studio_equipo','x_studio_pm_asociado','x_studio_trazabilidad_levantamiento','x_studio_stage_id']
         borrar_truefalse = ['EAN','Trazabilidad levantamiento','Codigo regional']
 
-        # DESCARGA DE TABLAS
-        self.getDataFromModel(modelo,filtro1,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp1',None,formato='csv')
-        self.getDataFromModel(modelo,filtro2,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp2',None,formato='csv')
-        self.getDataFromModel(modelo,filtro3,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp3',None,formato='csv')
-
-        # JUNTAR TABLAS
-        f1 = pd.read_csv('temp1.csv')
-        f2 = pd.read_csv('temp2.csv')
-        f3 = pd.read_csv('temp3.csv')
+        f1 = self.getDataFromModel(modelo,filtro1,campos,header=header,campos_fk=campos_fk,ret_=True)
+        f2 = self.getDataFromModel(modelo,filtro2,campos,header=header,campos_fk=campos_fk,ret_=True)
+        f3 = self.getDataFromModel(modelo,filtro3,campos,header=header,campos_fk=campos_fk,ret_=True)
         f_final = pd.concat([f1,f2,f3],axis=0,ignore_index=1)
+
         # ADJUNTA CORREO
         actores = self.getDataFromModel('x_actores_relevantes',[],['x_name','x_studio_partner_email'],ret_=True)
         lista_correos = []                                                              
@@ -235,11 +227,6 @@ class OdooDownloadCenco(OdooDownloadBase):
         # LIMPIA TRUE-FALSE Y GUARDA
         self.resultadoBusqueda = self.quitarTrueFalse(f_final,borrar_truefalse)
         self.downloadExcel(filename,f'Comunicacion masiva Cenco-{unidad_negocio}','csv')
-
-        # BORRAR ARCHIVOS TEMPORALES
-        os.remove('temp1.csv')
-        os.remove('temp2.csv')
-        os.remove('temp3.csv')
 
     def declaracion_eye(self,unidad_negocio,periodo,filename=None):
         """
@@ -445,17 +432,9 @@ class OdooDownloadCorona(OdooDownloadBase):
         filtro3 = ["&",["x_studio_periodos","=",False],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision,proyectado,completado_parcial]]]
 
         # DESARGAR LAS TABLAS
-        self.getDataFromModel(modelo,filtro1,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp1',None,formato='csv')
-        self.getDataFromModel(modelo,filtro2,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp2',None,formato='csv')
-        self.getDataFromModel(modelo,filtro3,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp3',None,formato='csv')
-
-        # JUNTAR TABLAS
-        f1 = pd.read_csv('temp1.csv')
-        f2 = pd.read_csv('temp2.csv')
-        f3 = pd.read_csv('temp3.csv')
+        f1 = self.getDataFromModel(modelo,filtro1,campos,header=header,campos_fk=campos_fk,ret_=True)
+        f2 = self.getDataFromModel(modelo,filtro2,campos,header=header,campos_fk=campos_fk,ret_=True)
+        f3 = self.getDataFromModel(modelo,filtro3,campos,header=header,campos_fk=campos_fk,ret_=True)
         f_final = pd.concat([f1,f2,f3],axis=0,ignore_index=1)
 
         # ADJUNTA CORREO
@@ -474,11 +453,6 @@ class OdooDownloadCorona(OdooDownloadBase):
         # DESCARGAR EXCEL
         self.resultadoBusqueda = self.quitarTrueFalse(f_final,borrar_truefalse)
         self.downloadExcel(filename,'Comunicacion masiva Corona','csv')
-
-        # BORRAR ARCHIVOS TEMPORALES
-        os.remove('temp1.csv')
-        os.remove('temp2.csv')
-        os.remove('temp3.csv')
 
     def declaracion_eye(self,periodo,filename=None):
         """
@@ -634,17 +608,9 @@ class OdooDownloadTottus(OdooDownloadBase):
 
 
         # DESARGAR LAS TABLAS
-        self.getDataFromModel(modelo,filtro1,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp1',None,formato='csv')
-        self.getDataFromModel(modelo,filtro2,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp2',None,formato='csv')
-        self.getDataFromModel(modelo,filtro3,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp3',None,formato='csv')
-
-        # JUNTAR TABLAS
-        f1 = pd.read_csv('temp1.csv')
-        f2 = pd.read_csv('temp2.csv')
-        f3 = pd.read_csv('temp3.csv')
+        f1 = self.getDataFromModel(modelo,filtro1,campos,header=header,campos_fk=campos_fk,ret_=True)
+        f2 = self.getDataFromModel(modelo,filtro2,campos,header=header,campos_fk=campos_fk,ret_=True)
+        f3 = self.getDataFromModel(modelo,filtro3,campos,header=header,campos_fk=campos_fk,ret_=True)
         f_final = pd.concat([f1,f2,f3],axis=0,ignore_index=1)
 
 
@@ -663,11 +629,6 @@ class OdooDownloadTottus(OdooDownloadBase):
 
         self.resultadoBusqueda = self.quitarTrueFalse(f_final,borrar_truefalse)
         self.downloadExcel(filename,'Comunicacion masiva tottus','csv')
-
-        # BORRAR ARCHIVOS TEMPORALES
-        os.remove('temp1.csv')
-        os.remove('temp2.csv')
-        os.remove('temp3.csv')
   
     def declaracion_eye(self,periodo,filename=None):
         """
@@ -823,17 +784,9 @@ class OdooDownloadDimerc(OdooDownloadBase):
         borrar_truefalse = ['Equipo','Proveedor','Trazabilidad levantamiento','EAN','Actor relevante','Actor relevante/Correo electrónico']
 
         # DESARGAR LAS TABLAS
-        self.getDataFromModel(modelo,filtro1,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp1',None,formato='csv')
-        self.getDataFromModel(modelo,filtro2,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp2',None,formato='csv')
-        self.getDataFromModel(modelo,filtro3,campos,header=header,campos_fk=campos_fk)
-        self.downloadExcel('temp3',None,formato='csv')
-
-        # JUNTAR TABLAS
-        f1 = pd.read_csv('temp1.csv')
-        f2 = pd.read_csv('temp2.csv')
-        f3 = pd.read_csv('temp3.csv')
+        f1 = self.getDataFromModel(modelo,filtro1,campos,header=header,campos_fk=campos_fk,ret_=True)
+        f2 = self.getDataFromModel(modelo,filtro2,campos,header=header,campos_fk=campos_fk,ret_=True)
+        f3 = self.getDataFromModel(modelo,filtro3,campos,header=header,campos_fk=campos_fk,ret_=True)
         f_final = pd.concat([f1,f2,f3],axis=0,ignore_index=1)
 
         # ADJUNTA CORREO
@@ -851,11 +804,6 @@ class OdooDownloadDimerc(OdooDownloadBase):
 
         self.resultadoBusqueda = self.quitarTrueFalse(f_final,borrar_truefalse)
         self.downloadExcel(filename,f'Comunicacion masiva Dimerc-{unidad_negocio}','csv')
-
-        # BORRAR ARCHIVOS TEMPORALES
-        os.remove('temp1.csv')
-        os.remove('temp2.csv')
-        os.remove('temp3.csv')
 
     def declaracion_eye(self,periodo,unidad_negocio,filename=None):
         """
@@ -1136,4 +1084,4 @@ class OdooDownloadLuccetti(OdooDownloadBase):
         Returns:
         - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
         """
-        
+        pass
