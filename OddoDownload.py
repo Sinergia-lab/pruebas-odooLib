@@ -160,9 +160,11 @@ class OdooDownloadBase:
         # LEER Y COMPROBAR PLASTICOS FUERA DE FLEXIBLE Y RIGIDO
         # ====================================================
         eye_partes = pd.read_excel('archivos_generados/declaracion '+filename+'.xlsx')
+        eye_partes_original = eye_partes.copy()
         eye_partes = eye_partes.fillna(' ')
         col_categoria_material = index[0]
         col_caracteristica = index[1]
+        col_material = index[2]
         self.warning_plasticos(eye_partes,col_categoria_material,col_caracteristica)
         self.warning_peligrosidad(eye_partes)
         
@@ -170,7 +172,7 @@ class OdooDownloadBase:
         # ELIMINAR LA SUBCATEGORIA DE LOS NO PLASTICOS
         # ====================================================
         def borrar_caracterticas_no_plasticos(x):
-            if x[col_categoria_material] != 'PLÁSTICOS':
+            if x[col_categoria_material] != 'PLÁSTICOS' or x[col_material] in ['Botellas PET (1)','Otros envases PET (1)','Plástico compostable']:
                 x[col_caracteristica] = ' '
             return x
         eye_partes = eye_partes.apply(borrar_caracterticas_no_plasticos,axis=1)
@@ -179,26 +181,34 @@ class OdooDownloadBase:
         eye_partes_sidoc = eye_partes[eye_partes[col_categoria]=='EYE Domiciliario']
 
         with pd.ExcelWriter('archivos_generados/'+filename+'.xlsx') as writer:
-        # =============
-        # DOMICILIARIO
-        # =============
+            # =============
+            # DOMICILIARIO
+            # =============
             pvt_sidoc = pd.pivot_table(eye_partes_sidoc,'Peso total (ton)',
                                 index=index,
                                 columns=columnas,aggfunc='sum',fill_value=0)
 
             pvt_sidoc.to_excel(writer,sheet_name='Declaracion lb',startrow=0,startcol=0)
-        # =============
-        # NO DOMICILIARIO
-        # =============
+            # =============
+            # NO DOMICILIARIO
+            # =============
             pvt_nodoc = pd.pivot_table(eye_partes_nodoc,'Peso total (ton)',
                                 index=index,
                                 columns=columnas,aggfunc='sum',fill_value=0)
             pvt_nodoc.to_excel(writer,sheet_name='Declaracion lb',startrow=0,startcol=7)
+            # =============
+            # ADJUNTAR PARTES
+            # =============
+            eye_partes_original.to_excel(writer,sheet_name='Partes')
+        print('Se ha generado el archivo',filename+'.xlsx')
+
 
     def warning_plasticos(self,partes_eye,col_categoria_material,col_caracteristica):
         plasticos = partes_eye[partes_eye[col_categoria_material]=='PLÁSTICOS']
         plasticos_warning = plasticos[ (plasticos[col_caracteristica]!='Flexible') & (plasticos[col_caracteristica]!='Rígido') ]
-        plasticos_warning = plasticos_warning[ (plasticos_warning['Material']!='Otros envases PET (1)') & (plasticos_warning['Material']!='Plástico compostable') ]
+        plasticos_warning = plasticos_warning[ (plasticos_warning['Material']!='Botellas PET (1)') & 
+                                               (plasticos_warning['Material']!='Otros envases PET (1)') & 
+                                               (plasticos_warning['Material']!='Plástico compostable') ]
         if len(plasticos_warning):
             print('================================================================')
             print('Hay plasticos que no son flexibles ni rigidos')
