@@ -137,8 +137,8 @@ class OdooDownloadBase:
         filename = filename if filename else defaultname
         
         print('Generando archivo')
-        if formato=='xlsx':     self.resultadoBusqueda.to_excel(f'{filename}.xlsx',index=False)
-        elif formato=='csv':    self.resultadoBusqueda.to_csv(f'{filename}.csv',index=False)
+        if formato=='xlsx':     self.resultadoBusqueda.to_excel(f'archivos_generados/{filename}.xlsx',index=False)
+        elif formato=='csv':    self.resultadoBusqueda.to_csv(f'archivos_generados/{filename}.csv',index=False)
         else:                   raise Exception('Los formatos de archivo validos son "xlsx" y "csv"')
 
         print(f'Se ha generado el archivo {filename}.{formato}')
@@ -148,6 +148,77 @@ class OdooDownloadBase:
             df[campo] = df[campo].replace(False,to_replace)
             df[campo] = df[campo].replace('False',to_replace)
         return df
+
+    def entregable_eye_base(self,periodo,filename,col_categoria,index,columnas,unidad_negocio=None):
+        
+        if unidad_negocio is None:
+            self.declaracion_eye(periodo,'declaracion '+filename)
+        else:
+            self.declaracion_eye(periodo,unidad_negocio,'declaracion '+filename)
+
+        # ====================================================
+        # LEER Y COMPROBAR PLASTICOS FUERA DE FLEXIBLE Y RIGIDO
+        # ====================================================
+        eye_partes = pd.read_excel('archivos_generados/declaracion '+filename+'.xlsx')
+        eye_partes = eye_partes.fillna(' ')
+        col_categoria_material = index[0]
+        col_caracteristica = index[1]
+        self.warning_plasticos(eye_partes,col_categoria_material,col_caracteristica)
+        self.warning_peligrosidad(eye_partes)
+        
+        # ====================================================
+        # ELIMINAR LA SUBCATEGORIA DE LOS NO PLASTICOS
+        # ====================================================
+        def borrar_caracterticas_no_plasticos(x):
+            if x[col_categoria_material] != 'PLÁSTICOS':
+                x[col_caracteristica] = ' '
+            return x
+        eye_partes = eye_partes.apply(borrar_caracterticas_no_plasticos,axis=1)
+
+        eye_partes_nodoc = eye_partes[eye_partes[col_categoria]=='EYE No domiciliario']
+        eye_partes_sidoc = eye_partes[eye_partes[col_categoria]=='EYE Domiciliario']
+
+        with pd.ExcelWriter('archivos_generados/'+filename+'.xlsx') as writer:
+        # =============
+        # DOMICILIARIO
+        # =============
+            pvt_sidoc = pd.pivot_table(eye_partes_sidoc,'Peso total (ton)',
+                                index=index,
+                                columns=columnas,aggfunc='sum',fill_value=0)
+
+            pvt_sidoc.to_excel(writer,sheet_name='Declaracion lb',startrow=0,startcol=0)
+        # =============
+        # NO DOMICILIARIO
+        # =============
+            pvt_nodoc = pd.pivot_table(eye_partes_nodoc,'Peso total (ton)',
+                                index=index,
+                                columns=columnas,aggfunc='sum',fill_value=0)
+            pvt_nodoc.to_excel(writer,sheet_name='Declaracion lb',startrow=0,startcol=7)
+
+    def warning_plasticos(self,partes_eye,col_categoria_material,col_caracteristica):
+        plasticos = partes_eye[partes_eye[col_categoria_material]=='PLÁSTICOS']
+        plasticos_warning = plasticos[ (plasticos[col_caracteristica]!='Flexible') & (plasticos[col_caracteristica]!='Rígido') ]
+        plasticos_warning = plasticos_warning[ (plasticos_warning['Material']!='Otros envases PET (1)') & (plasticos_warning['Material']!='Plástico compostable') ]
+        if len(plasticos_warning):
+            print('================================================================')
+            print('Hay plasticos que no son flexibles ni rigidos')
+            print('Los registros con problemas se guardaran en el archivo logs_plasticos.xlsx')
+            print('================================================================')
+            self.resultadoBusqueda = plasticos_warning
+            self.downloadExcel('logs_plasticos',None,'xlsx')
+            # raise Exception('Plasticos no flexibles ni rigidos')
+    
+    def warning_peligrosidad(self,partes_eye):
+        sin_peligrosidad = partes_eye[ (partes_eye['Peligrosidad']!='Residuo NO Peligroso') & (partes_eye['Peligrosidad']!='Residuo Peligroso') ] 	
+        if len(sin_peligrosidad) != 0:
+            print('================================================================')
+            print('Hay elementos sin peligrosidad')
+            print('Los registros con problemas se guardaran en el archivo logs_peligrosidad.xlsx')
+            print('================================================================')
+            self.resultadoBusqueda = sin_peligrosidad
+            self.downloadExcel('logs_peligrosidad',None,'xlsx')
+
+        
 # ============================
 # PLANTILLAS PREDEFINIDAS
 # ============================
@@ -228,7 +299,7 @@ class OdooDownloadCenco(OdooDownloadBase):
         self.resultadoBusqueda = self.quitarTrueFalse(f_final,borrar_truefalse)
         self.downloadExcel(filename,f'Comunicacion masiva Cenco-{unidad_negocio}','csv')
 
-    def declaracion_eye(self,unidad_negocio,periodo,filename=None):
+    def declaracion_eye(self,periodo,unidad_negocio,filename=None):
         """
         Descarga la tabla declaracion eye.
 
@@ -240,7 +311,6 @@ class OdooDownloadCenco(OdooDownloadBase):
         Returns:
         - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
         """
-
         if unidad_negocio not in ['JUMBO','SISA','MDH','TXD']:
             raise Exception('La unidad de negocio debe ser "JUMBO", "SISA", MDH o TXD')
 
@@ -376,6 +446,13 @@ class OdooDownloadCenco(OdooDownloadBase):
         # ==================================
         self.resultadoBusqueda = declaracion_eye
         self.downloadExcel(filename,f'Declaracion_eye Cenco-{unidad_negocio}','xlsx')
+
+    def entregable_eye(self,periodo,unidad_negocio,filename=None):
+        filename = filename if filename else f'Entregable eye Cenco-{unidad_negocio}'
+        index = ['Categoría material','caracterítica del material (solo para plásticos, cartón y vidrio)','Material']
+        columnas = ['Peligrosidad']
+        col_categoria = 'Categoría'
+        self.entregable_eye_base(periodo,filename,col_categoria,index,columnas,unidad_negocio=unidad_negocio)
 
 class OdooDownloadCorona(OdooDownloadBase):
 
@@ -555,6 +632,14 @@ class OdooDownloadCorona(OdooDownloadBase):
         self.resultadoBusqueda = declaracion_eye
         self.downloadExcel(filename,f'Declaracion_eye Corona','xlsx')
 
+    def entregable_eye(self,periodo,filename=None):
+        filename = filename if filename else 'Entregable eye Corona'
+        index = ['Sub-categoría material','Característica del material','Material']
+        columnas = ['Peligrosidad']
+        col_categoria = 'Categoría'
+        
+        self.entregable_eye_base(periodo,filename,col_categoria,index,columnas)
+        
 class OdooDownloadTottus(OdooDownloadBase):
     def maestra(self,filename=None):
         """
@@ -727,6 +812,14 @@ class OdooDownloadTottus(OdooDownloadBase):
         # ==================================
         self.resultadoBusqueda = declaracion_eye
         self.downloadExcel(filename,'Declaracion_eye Tottus','xlsx')
+
+    def entregable_eye(self,periodo,filename=None):
+        filename = filename if filename else 'Entregable eye Tottus'
+        index = ['Sub-categoría material','Característica del material','Material']
+        columnas = ['Peligrosidad']
+        col_categoria = 'Categoría elemento'
+        
+        self.entregable_eye_base(periodo,filename,col_categoria,index,columnas)
 
 class OdooDownloadDimerc(OdooDownloadBase):
    
@@ -926,6 +1019,13 @@ class OdooDownloadDimerc(OdooDownloadBase):
         self.resultadoBusqueda = declaracion_eye
         self.downloadExcel(filename,f'Declaracion_eye Dimerc-{unidad_negocio}','xlsx')
 
+    def entregable_eye(self,periodo,unidad_negocio,filename=None):
+        filename = filename if filename else f'Entregable eye Dimerc-{unidad_negocio}'
+        index = ['Sub-categoría material','Característica del material','Material']
+        columnas = ['Peligrosidad']
+        col_categoria = 'Categoría elemento'
+        self.entregable_eye_base(periodo,filename,col_categoria,index,columnas,unidad_negocio=unidad_negocio)
+
 class OdooDownloadIansa(OdooDownloadBase):
 
     def maestra(self,unidad_negocio,filename=None):
@@ -1048,6 +1148,13 @@ class OdooDownloadIansa(OdooDownloadBase):
         # ==================================
         self.resultadoBusqueda = declaracion_eye
         self.downloadExcel(filename,f'Declaracion_eye Iansa-{unidad_negocio}','xlsx')
+
+    def entregable_eye(self,periodo,unidad_negocio,filename=None):
+        filename = filename if filename else f'Entregable eye Iansa-{unidad_negocio}'
+        index = ['Sub-categoría material','Característica del material','Material']
+        columnas = ['Peligrosidad']
+        col_categoria = 'Categoría elemento'
+        self.entregable_eye_base(periodo,filename,col_categoria,index,columnas,unidad_negocio=unidad_negocio)
 
 class OdooDownloadLuccetti(OdooDownloadBase):
     def maestra(self,filename=None):
@@ -1173,3 +1280,9 @@ class OdooDownloadLuccetti(OdooDownloadBase):
         self.resultadoBusqueda = declaracion_eye
         self.downloadExcel(filename,f'Declaracion_eye Corona','xlsx')
 
+    def entregable_eye(self,periodo,filename=None):
+        filename = filename if filename else 'Entregable eye Iansa'
+        index = ['Sub-categoría material','Característica del material','Material']
+        columnas = ['Peligrosidad']
+        col_categoria = 'Categoría elemento'
+        self.entregable_eye_base(periodo,filename,col_categoria,index,columnas)

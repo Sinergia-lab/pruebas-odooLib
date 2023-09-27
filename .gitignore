@@ -1,4 +1,4 @@
 .venv/
+archivos_generados/
+odoo_lambda/
 __pycache__
-*.csv
-*.xlsx
