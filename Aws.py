@@ -10,8 +10,8 @@ import os
 
 class Aws:
     def __init__(self):
-        access = 'AKIATCHJFWYYCAIOCZPW'
-        secret = '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'
+        access = '' # Las credenciales las tengo en el escritorio
+        secret = ''
 
         self.s3_resource=boto3.resource('s3',aws_access_key_id=access,aws_secret_access_key=secret)
     def obtenerBucket(self,nombreBucket):
