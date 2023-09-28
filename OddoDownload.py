@@ -1299,10 +1299,10 @@ class OdooDownloadLuccetti(OdooDownloadBase):
                 'Característica retornable','Peligrosidad','Sub-categoría material']
         declaracion_eye = self.quitarTrueFalse(declaracion_eye,campos_false)
         self.resultadoBusqueda = declaracion_eye
-        self.downloadExcel(filename,f'Declaracion_eye Corona','xlsx')
+        self.downloadExcel(filename,f'Declaracion_eye Lucceti','xlsx')
 
     def entregable_eye(self,periodo,filename=None):
-        filename = filename if filename else 'Entregable eye Iansa'
+        filename = filename if filename else 'Entregable eye Luccetti'
         index = ['Sub-categoría material','Característica del material','Material']
         columnas = ['Peligrosidad']
         col_categoria = 'Categoría elemento'
