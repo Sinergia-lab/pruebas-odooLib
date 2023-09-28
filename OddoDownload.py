@@ -150,16 +150,33 @@ class OdooDownloadBase:
         return df
 
     def entregable_eye_base(self,periodo,filename,col_categoria,index,columnas,unidad_negocio=None):
-        
+        """
+        Es llamado por las clases hijas para generar el entregable de la declaracion eye. 
+        El flujo es el siguiente: Primero se llame entregable_eye() desde la clase hija. entregable_eye() llama a entregable_eye_base()
+        de la clase padre, y entregable_eye_base() llama a declaracion_eye() de la clase hija y guarda su resultado en self.resultados_busqueda
+        para usarlo sin descargar el archivo con las partes.
+
+        Parametros:
+        - periodo: (int) Periodo de la declaracion.
+        - filename: (str) Nombre del archivo final a generar.
+        - col_categoria: (str) Nombre de la columna donde se guarda la categoria de la parte (Domicialirio/no domiciliario) 
+        - index: (list) Columnas de la declaracion eye a usuarse como filas en la tabla dinamica.
+        - columnas: (list) Columnas de la declaracion eye a usasrse como columnas en la tabla dinamica.
+        - unidad_negocio: (str). Opcional. Unidad de negocio para la declaracion.
+
+        Returns
+        - Ninguno: Se genera un archivo xlsx
+        """
+
         if unidad_negocio is None:
-            self.declaracion_eye(periodo,'declaracion '+filename)
+            self.declaracion_eye(periodo,'declaracion '+filename,download=False)
         else:
-            self.declaracion_eye(periodo,unidad_negocio,'declaracion '+filename)
+            self.declaracion_eye(periodo,unidad_negocio,'declaracion '+filename,download=False)
 
         # ====================================================
         # LEER Y COMPROBAR PLASTICOS FUERA DE FLEXIBLE Y RIGIDO
         # ====================================================
-        eye_partes = pd.read_excel('archivos_generados/declaracion '+filename+'.xlsx')
+        eye_partes = self.resultadoBusqueda
         eye_partes_original = eye_partes.copy()
         eye_partes = eye_partes.fillna(' ')
         col_categoria_material = index[0]
@@ -203,6 +220,18 @@ class OdooDownloadBase:
         print('Se ha generado el archivo',filename+'.xlsx')
 
     def warning_plasticos(self,partes_eye,col_categoria_material,col_caracteristica):
+        """
+        Avisa si es que hay plasticos que no sean flexibles o rigidos. Envia un mensaje por consola y las partes con problemas
+        las envia a un archivo de logs.
+        
+        Parametros:
+        - partes_eye: (pd.Datafranme) Dataframe con todas las partes
+        - col_categoria_material: (str) Nombre de la columna con la categoria del material (ej. Plasticos)
+        - col_caracteristica: (str) Nombre de la columna con la caracteristica del material (ej.Flexible o rigido)
+        
+        Returns:
+        - Ninguno: Genera un archivo xlsx
+        """
         plasticos = partes_eye[partes_eye[col_categoria_material]=='PLÁSTICOS']
         plasticos_warning = plasticos[ (plasticos[col_caracteristica]!='Flexible') & (plasticos[col_caracteristica]!='Rígido') ]
         plasticos_warning = plasticos_warning[ (plasticos_warning['Material']!='Botellas PET (1)') & 
@@ -218,6 +247,16 @@ class OdooDownloadBase:
             # raise Exception('Plasticos no flexibles ni rigidos')
     
     def warning_peligrosidad(self,partes_eye):
+        """
+        Avisa si es que hay partes sin clasificacion de peligrosidad. Envia un mensaje por console y los productos los guarda en un archivo 
+        de logs.
+        
+        Parametros:
+        - partes_eye: (pd.Datafranme) Dataframe con todas las partes
+
+        Returns:
+        - Ninguno: Genera un archivo xlsx
+        """
         sin_peligrosidad = partes_eye[ (partes_eye['Peligrosidad']!='Residuo NO Peligroso') & (partes_eye['Peligrosidad']!='Residuo Peligroso') ] 	
         if len(sin_peligrosidad) != 0:
             print('================================================================')
@@ -316,7 +355,7 @@ class OdooDownloadCenco(OdooDownloadBase):
         self.resultadoBusqueda = self.quitarTrueFalse(f_final,borrar_truefalse)
         self.downloadExcel(filename,f'Comunicacion masiva Cenco-{unidad_negocio}','csv')
 
-    def declaracion_eye(self,periodo,unidad_negocio,filename=None):
+    def declaracion_eye(self,periodo,unidad_negocio,filename=None,download=True):
         """
         Descarga la tabla declaracion eye.
 
@@ -324,6 +363,7 @@ class OdooDownloadCenco(OdooDownloadBase):
         - anho: Filtro del Periodo que se quiere descargar
         - unidad_negocio: Filtro Nombre de la unidad de negocio a descargar
         - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+        - download: Opcional. Si es false el archivo no se descarga (pero queda guardado en self.resultadosbusqueda)
 
         Returns:
         - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
@@ -466,9 +506,20 @@ class OdooDownloadCenco(OdooDownloadBase):
         # DESCARGAR
         # ==================================
         self.resultadoBusqueda = declaracion_eye
-        self.downloadExcel(filename,f'Declaracion_eye Cenco-{unidad_negocio}','xlsx')
+        if download:
+            self.downloadExcel(filename,f'Declaracion_eye Cenco-{unidad_negocio}','xlsx')
 
     def entregable_eye(self,periodo,unidad_negocio,filename=None):
+        """
+        Genera el archivo de entregable final
+        
+        Parametros:
+        - periodo: (Int) Periodo a calcular.
+        - filemane: (str) Nombre del archivo final a generar. No escribir la extension xlsx
+
+        Returns:
+        - Ninguno: Genera un archivo xlsx
+        """
         filename = filename if filename else f'Entregable eye Cenco-{unidad_negocio}'
         index = ['Categoría material','caracterítica del material (solo para plásticos, cartón y vidrio)','Material']
         columnas = ['Peligrosidad']
@@ -552,13 +603,14 @@ class OdooDownloadCorona(OdooDownloadBase):
         self.resultadoBusqueda = self.quitarTrueFalse(f_final,borrar_truefalse)
         self.downloadExcel(filename,'Comunicacion masiva Corona','csv')
 
-    def declaracion_eye(self,periodo,filename=None):
+    def declaracion_eye(self,periodo,filename=None,download=True):
         """
         Descarga la tabla declaracion eye.
 
         Parametros:
         - anho: Filtro del Periodo que se quiere descargar
         - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+        - download: Opcional. Si es false el archivo no se descarga (pero queda guardado en self.resultadosbusqueda)
 
         Returns:
         - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
@@ -651,9 +703,20 @@ class OdooDownloadCorona(OdooDownloadBase):
                 'Caracteristica retornable','Peligrosidad','Categoría','Sub-categoría material']
         declaracion_eye = self.quitarTrueFalse(declaracion_eye,campos_false)
         self.resultadoBusqueda = declaracion_eye
-        self.downloadExcel(filename,f'Declaracion_eye Corona','xlsx')
+        if download:
+            self.downloadExcel(filename,f'Declaracion_eye Corona','xlsx')
 
     def entregable_eye(self,periodo,filename=None):
+        """
+        Genera el archivo de entregable final
+        
+        Parametros:
+        - periodo: (Int) Periodo a calcular.
+        - filemane: (str) Nombre del archivo final a generar. No escribir la extension xlsx
+
+        Returns:
+        - Ninguno: Genera un archivo xlsx
+        """
         filename = filename if filename else 'Entregable eye Corona'
         index = ['Sub-categoría material','Característica del material','Material']
         columnas = ['Peligrosidad']
@@ -736,13 +799,14 @@ class OdooDownloadTottus(OdooDownloadBase):
         self.resultadoBusqueda = self.quitarTrueFalse(f_final,borrar_truefalse)
         self.downloadExcel(filename,'Comunicacion masiva tottus','csv')
   
-    def declaracion_eye(self,periodo,filename=None):
+    def declaracion_eye(self,periodo,filename=None,download=True):
         """
         Descarga la tabla declaracion eye.
 
         Parametros:
         - anho: Filtro del Periodo que se quiere descargar
         - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+        - download: Opcional. Si es false el archivo no se descarga (pero queda guardado en self.resultadosbusqueda)
 
         Returns:
         - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
@@ -832,9 +896,20 @@ class OdooDownloadTottus(OdooDownloadBase):
         # DESCARGAR
         # ==================================
         self.resultadoBusqueda = declaracion_eye
-        self.downloadExcel(filename,'Declaracion_eye Tottus','xlsx')
+        if download:
+            self.downloadExcel(filename,'Declaracion_eye Tottus','xlsx')
 
     def entregable_eye(self,periodo,filename=None):
+        """
+        Genera el archivo de entregable final
+        
+        Parametros:
+        - periodo: (Int) Periodo a calcular.
+        - filemane: (str) Nombre del archivo final a generar. No escribir la extension xlsx
+
+        Returns:
+        - Ninguno: Genera un archivo xlsx
+        """
         filename = filename if filename else 'Entregable eye Tottus'
         index = ['Sub-categoría material','Característica del material','Material']
         columnas = ['Peligrosidad']
@@ -919,7 +994,7 @@ class OdooDownloadDimerc(OdooDownloadBase):
         self.resultadoBusqueda = self.quitarTrueFalse(f_final,borrar_truefalse)
         self.downloadExcel(filename,f'Comunicacion masiva Dimerc-{unidad_negocio}','csv')
 
-    def declaracion_eye(self,periodo,unidad_negocio,filename=None):
+    def declaracion_eye(self,periodo,unidad_negocio,filename=None,download=True):
         """
         Descarga la tabla declaracion eye.
 
@@ -927,6 +1002,7 @@ class OdooDownloadDimerc(OdooDownloadBase):
         - anho: Filtro del Periodo que se quiere descargar
         - unidad_negocio: Filtro Nombre de la unidad de negocio a descargar
         - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+        - download: Opcional. Si es false el archivo no se descarga (pero queda guardado en self.resultadosbusqueda)
 
         Returns:
         - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
@@ -1038,9 +1114,20 @@ class OdooDownloadDimerc(OdooDownloadBase):
         # DESCARGAR
         # ==================================
         self.resultadoBusqueda = declaracion_eye
-        self.downloadExcel(filename,f'Declaracion_eye Dimerc-{unidad_negocio}','xlsx')
+        if download:
+            self.downloadExcel(filename,f'Declaracion_eye Dimerc-{unidad_negocio}','xlsx')
 
     def entregable_eye(self,periodo,unidad_negocio,filename=None):
+        """
+        Genera el archivo de entregable final
+        
+        Parametros:
+        - periodo: (Int) Periodo a calcular.
+        - filemane: (str) Nombre del archivo final a generar. No escribir la extension xlsx
+
+        Returns:
+        - Ninguno: Genera un archivo xlsx
+        """
         filename = filename if filename else f'Entregable eye Dimerc-{unidad_negocio}'
         index = ['Sub-categoría material','Característica del material','Material']
         columnas = ['Peligrosidad']
@@ -1069,7 +1156,7 @@ class OdooDownloadIansa(OdooDownloadBase):
         self.getDataFromModel(modelo,filtros,campos,header,campos_fk=campos_fk)
         self.downloadExcel(filename,f'Maestra Iansa-{unidad_negocio}','csv')
 
-    def declaracion_eye(self,periodo,unidad_negocio,filename=None):
+    def declaracion_eye(self,periodo,unidad_negocio,filename=None,download=True):
         """
         Descarga la tabla declaracion eye.
 
@@ -1077,6 +1164,7 @@ class OdooDownloadIansa(OdooDownloadBase):
         - anho: Filtro del Periodo que se quiere descargar
         - unidad_negocio: Filtro Nombre de la unidad de negocio a descargar
         - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+        - download: Opcional. Si es false el archivo no se descarga (pero queda guardado en self.resultadosbusqueda)
 
         Returns:
         - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
@@ -1168,9 +1256,20 @@ class OdooDownloadIansa(OdooDownloadBase):
         # DESCARGAR
         # ==================================
         self.resultadoBusqueda = declaracion_eye
-        self.downloadExcel(filename,f'Declaracion_eye Iansa-{unidad_negocio}','xlsx')
+        if download:
+            self.downloadExcel(filename,f'Declaracion_eye Iansa-{unidad_negocio}','xlsx')
 
     def entregable_eye(self,periodo,unidad_negocio,filename=None):
+        """
+        Genera el archivo de entregable final
+        
+        Parametros:
+        - periodo: (Int) Periodo a calcular.
+        - filemane: (str) Nombre del archivo final a generar. No escribir la extension xlsx
+
+        Returns:
+        - Ninguno: Genera un archivo xlsx
+        """
         filename = filename if filename else f'Entregable eye Iansa-{unidad_negocio}'
         index = ['Sub-categoría material','Característica del material','Material']
         columnas = ['Peligrosidad']
@@ -1201,13 +1300,14 @@ class OdooDownloadLuccetti(OdooDownloadBase):
 
         self.downloadExcel(filename,f'Maestra Luccetti','csv')
 
-    def declaracion_eye(self,periodo,filename=None):
+    def declaracion_eye(self,periodo,filename=None,download=True):
         """
         Descarga la tabla declaracion eye.
 
         Parametros:
         - anho: Filtro del Periodo que se quiere descargar
         - filemane: Opcional. Nombre del archivo. Si no es especificado se utiliza nombre por defecto
+        - download: Opcional. Si es false el archivo no se descarga (pero queda guardado en self.resultadosbusqueda)
 
         Returns:
         - Ninguno: La funcion genera un archivo csv denominado Comunicacion Masiva.csv
@@ -1299,9 +1399,20 @@ class OdooDownloadLuccetti(OdooDownloadBase):
                 'Característica retornable','Peligrosidad','Sub-categoría material']
         declaracion_eye = self.quitarTrueFalse(declaracion_eye,campos_false)
         self.resultadoBusqueda = declaracion_eye
-        self.downloadExcel(filename,f'Declaracion_eye Lucceti','xlsx')
+        if download:
+            self.downloadExcel(filename,f'Declaracion_eye Lucceti','xlsx')
 
     def entregable_eye(self,periodo,filename=None):
+        """
+        Genera el archivo de entregable final
+        
+        Parametros:
+        - periodo: (Int) Periodo a calcular.
+        - filemane: (str) Nombre del archivo final a generar. No escribir la extension xlsx
+
+        Returns:
+        - Ninguno: Genera un archivo xlsx
+        """
         filename = filename if filename else 'Entregable eye Luccetti'
         index = ['Sub-categoría material','Característica del material','Material']
         columnas = ['Peligrosidad']
