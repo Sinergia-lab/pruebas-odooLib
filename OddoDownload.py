@@ -202,7 +202,6 @@ class OdooDownloadBase:
             eye_partes_original.to_excel(writer,sheet_name='Partes')
         print('Se ha generado el archivo',filename+'.xlsx')
 
-
     def warning_plasticos(self,partes_eye,col_categoria_material,col_caracteristica):
         plasticos = partes_eye[partes_eye[col_categoria_material]=='PLÁSTICOS']
         plasticos_warning = plasticos[ (plasticos[col_caracteristica]!='Flexible') & (plasticos[col_caracteristica]!='Rígido') ]
@@ -250,7 +249,10 @@ class OdooDownloadCenco(OdooDownloadBase):
             raise Exception('La unidad de negocio debe ser SMK, MDH o TXD')
 
         modelo = 'x_productos'
-        filtros = [('x_studio_unidades_de_negocio','=',unidad_negocio)]
+        if unidad_negocio=='TXD':
+            filtros = ['&','&',('x_studio_unidades_de_negocio','=',unidad_negocio),('x_studio_tag_ids','ilike','TxD - SKUs'),('x_active','=',True)]
+        else:
+            filtros = ['&',('x_studio_unidades_de_negocio','=',unidad_negocio),('x_active','=',True)]
         campos = ['x_studio_sku_unidad_de_negocio','x_name','x_studio_stage_id','x_studio_variable_de_marcado','x_studio_candidato_a_analisis_fisico']
         header = ['SKU unidad negocio','SKU','Etapa','EVA','Analisis fisico']
         campos_fk = ['x_studio_stage_id']
@@ -277,9 +279,14 @@ class OdooDownloadCenco(OdooDownloadBase):
             raise Exception('La unidad de negocio debe ser "SMK", MDH o TXD')
 
         # PARAMETROS
-        filtro1 = ["&","&",["x_studio_periodos.x_name","=",anho],["x_studio_unidades_de_negocio","=",unidad_negocio],"|",["x_studio_stage_id","=",2],["x_studio_stage_id","=",5]]
-        filtro2 = ["&","&","&",["x_studio_periodos.x_name","=",anho],["x_studio_unidades_de_negocio","=",unidad_negocio],["x_studio_stage_id","=",3],["x_studio_variable_de_marcado","=",1]]
-        filtro3 = ["&","&",["x_studio_periodos","=",False],["x_studio_unidades_de_negocio","=",unidad_negocio],"|",["x_studio_stage_id","=",2],["x_studio_stage_id","=",5]]
+        if unidad_negocio == 'TXD':
+            filtro1 = ["&","&","&","&",('x_active','=',True),('x_studio_tag_ids','ilike','TxD - SKUs'),["x_studio_periodos.x_name","=",anho],["x_studio_unidades_de_negocio","=",unidad_negocio],"|",["x_studio_stage_id","=",2],["x_studio_stage_id","=",5]]
+            filtro2 = ["&","&","&","&","&",('x_active','=',True),('x_studio_tag_ids','ilike','TxD - SKUs'),["x_studio_periodos.x_name","=",anho],["x_studio_unidades_de_negocio","=",unidad_negocio],["x_studio_stage_id","=",3],["x_studio_variable_de_marcado","=",1]]
+            filtro3 = ["&","&","&","&",('x_active','=',True),('x_studio_tag_ids','ilike','TxD - SKUs'),["x_studio_periodos","=",False],["x_studio_unidades_de_negocio","=",unidad_negocio],"|",["x_studio_stage_id","=",2],["x_studio_stage_id","=",5]]
+        else:
+            filtro1 = ["&","&","&",('x_active','=',True),["x_studio_periodos.x_name","=",anho],["x_studio_unidades_de_negocio","=",unidad_negocio],"|",["x_studio_stage_id","=",2],["x_studio_stage_id","=",5]]
+            filtro2 = ["&","&","&","&",('x_active','=',True),["x_studio_periodos.x_name","=",anho],["x_studio_unidades_de_negocio","=",unidad_negocio],["x_studio_stage_id","=",3],["x_studio_variable_de_marcado","=",1]]
+            filtro3 = ["&","&","&",('x_active','=',True),["x_studio_periodos","=",False],["x_studio_unidades_de_negocio","=",unidad_negocio],"|",["x_studio_stage_id","=",2],["x_studio_stage_id","=",5]]
         campos = ['x_studio_sku_unidad_de_negocio','x_studio_cdigo_regional','x_studio_descripcin','x_studio_ean','x_studio_proveedor','x_studio_equipo',
           'x_studio_pm_asociado','x_studio_trazabilidad_levantamiento','x_studio_stage_id']
         modelo = 'x_productos'
@@ -354,7 +361,11 @@ class OdooDownloadCenco(OdooDownloadBase):
         # DESCARGAR TABLA DE VENTAS
         # =========================
         modelo = 'x_ventas'
-        filtros = ['&',('x_studio_unidades_de_negocio','=',unidad_negocio),('x_studio_periodo.x_name','=',periodo)]
+        if unidad_negocio == 'TXD':
+            filtros = ['&','&','&',('x_studio_activo_producto','=',True),('x_studio_unidades_de_negocio','=',unidad_negocio),('x_studio_periodo.x_name','=',periodo),
+                       ('x_studio_categoras_producto','ilike','TxD - SKUs')]
+        else:
+            filtros = ['&','&',('x_studio_activo_producto','=',True),('x_studio_unidades_de_negocio','=',unidad_negocio),('x_studio_periodo.x_name','=',periodo)]
         campos = ['x_studio_producto','x_studio_descripcin_producto','x_studio_elementos_del_producto'] + campos_ventas_totales
         header = ['Producto','Producto/Descripción','lista_elementos'] + header_ventas_totales 
         campos_fk = ['x_studio_producto']
@@ -477,7 +488,7 @@ class OdooDownloadCorona(OdooDownloadBase):
         - Ninguno: Ninguno. Se genera un archivo en el disco duro.
         """
         modelo = 'x_productos'
-        filtros = []
+        filtros = [('x_active','=',True)]
         campos = ['x_name','x_studio_stage_id']
         header = ['Name','Etapa']
         campos_fk = ['x_studio_stage_id']
@@ -514,9 +525,9 @@ class OdooDownloadCorona(OdooDownloadBase):
         borrar_truefalse = ['EAN','Trazabilidad levantamiento']
 
 
-        filtro1 = ["&",["x_studio_periodos.x_name","=",periodo],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision,proyectado,completado_parcial]]]
-        filtro2 = ["&","&",["x_studio_periodos.x_name","=",periodo],["x_studio_stage_id","=",completado],["x_studio_aux","=",1]]
-        filtro3 = ["&",["x_studio_periodos","=",False],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision,proyectado,completado_parcial]]]
+        filtro1 = ["&","&",('x_active','=',True),["x_studio_periodos.x_name","=",periodo],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision,proyectado,completado_parcial]]]
+        filtro2 = ["&","&","&",('x_active','=',True),["x_studio_periodos.x_name","=",periodo],["x_studio_stage_id","=",completado],["x_studio_aux","=",1]]
+        filtro3 = ["&","&",('x_active','=',True),["x_studio_periodos","=",False],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision,proyectado,completado_parcial]]]
 
         # DESARGAR LAS TABLAS
         f1 = self.getDataFromModel(modelo,filtro1,campos,header=header,campos_fk=campos_fk,ret_=True)
@@ -557,7 +568,7 @@ class OdooDownloadCorona(OdooDownloadBase):
         # =========================
 
         modelo = 'x_unidades_vendidas'
-        filtros = [('x_studio_periodo.x_name','=',periodo)]
+        filtros = ['&',('x_studio_activo_producto','=',True),('x_studio_periodo.x_name','=',periodo)]
         campos = ['x_studio_producto','x_studio_total_venta','x_studio_elementos_del_producto']
         header = ['Producto','Total venta','lista elementos'] 
         campos_fk = ['x_studio_producto']
@@ -662,7 +673,7 @@ class OdooDownloadTottus(OdooDownloadBase):
         - Ninguno: Ninguno. Se genera un archivo en el disco duro.
         """
         modelo = 'x_productos'
-        filtros = []
+        filtros = [('x_active','=',True)]
         campos = ['x_name','x_studio_stage_id','x_studio_variable_de_marcado','x_studio_tipo_de_envase_opcional']
         header = ['SKU','Etapa','Variable de marcado','Tipo de envase (opcional)']
         campos_fk = ['x_studio_stage_id']
@@ -697,9 +708,9 @@ class OdooDownloadTottus(OdooDownloadBase):
         campos_fk = ['x_studio_equipo','x_studio_division','x_studio_proveedor','x_studio_actor_relevante','x_studio_trazabilidad_levantamiento','x_studio_stage_id']
         borrar_truefalse = ['Actor relevante/Correo electrónico','Trazabilidad levantamiento']
 
-        filtro1 = ["&",["x_studio_periodos.x_name","=",periodo],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision,proyectado,completado_parcial]]]
-        filtro2 = ["&","&",["x_studio_periodos.x_name","=",periodo],["x_studio_stage_id","=",completado],["x_studio_variable_de_marcado","=",1]]
-        filtro3 = ["&",["x_studio_periodos","=",False],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision,proyectado,completado_parcial]]]
+        filtro1 = ["&","&",('x_active','=',True),["x_studio_periodos.x_name","=",periodo],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision,proyectado,completado_parcial]]]
+        filtro2 = ["&","&","&",('x_active','=',True),["x_studio_periodos.x_name","=",periodo],["x_studio_stage_id","=",completado],["x_studio_variable_de_marcado","=",1]]
+        filtro3 = ["&","&",('x_active','=',True),["x_studio_periodos","=",False],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision,proyectado,completado_parcial]]]
 
 
         # DESARGAR LAS TABLAS
@@ -741,7 +752,7 @@ class OdooDownloadTottus(OdooDownloadBase):
         # =========================
 
         modelo = 'x_unidades_vendidas'
-        filtros = [('x_studio_periodo.x_name','=',periodo)]
+        filtros = ['&',('x_studio_activo_producto','=',True),('x_studio_periodo.x_name','=',periodo)]
         campos = ['x_studio_producto','x_studio_unidades_vendidas','x_studio_elementos_del_producto']
         header = ['Producto','Unidades vendidas','lista elementos'] 
         campos_fk = ['x_studio_producto']
@@ -848,7 +859,7 @@ class OdooDownloadDimerc(OdooDownloadBase):
             raise Exception('La unidad de negocios debe ser DIMERC, PRONOBEL o DIMEIGGS')
 
         modelo = 'x_productos'
-        filtros = [('x_studio_unidades_de_negocio','=',unidad_negocio)]
+        filtros = ['&',('x_studio_unidades_de_negocio','=',unidad_negocio),('x_active','=',True)]
         campos = ['x_name','x_studio_stage_id','x_studio_levantamiento_asalvo']
         header = ['SKU','Etapa','Levantamiento ASALVO']
         campos_fk = ['x_studio_stage_id']
@@ -875,9 +886,9 @@ class OdooDownloadDimerc(OdooDownloadBase):
         no_completado_revision = 2
         completado = 3
 
-        filtro1 = ["&","&",["x_studio_periodo.x_name","=",periodo],["x_studio_unidades_de_negocio","=",unidad_negocio],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision]]]
-        filtro2 = ["&","&","&",["x_studio_periodo.x_name","=",periodo],["x_studio_unidades_de_negocio","=",unidad_negocio],["x_studio_stage_id","=",completado],["x_studio_levantamiento_asalvo","=",1]]
-        filtro3 = ["&","&",["x_studio_periodo","=",False],["x_studio_unidades_de_negocio","=",unidad_negocio],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision]]]
+        filtro1 = ["&","&","&",('x_active','=',True),["x_studio_periodo.x_name","=",periodo],["x_studio_unidades_de_negocio","=",unidad_negocio],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision]]]
+        filtro2 = ["&","&","&","&",('x_active','=',True),["x_studio_periodo.x_name","=",periodo],["x_studio_unidades_de_negocio","=",unidad_negocio],["x_studio_stage_id","=",completado],["x_studio_levantamiento_asalvo","=",1]]
+        filtro3 = ["&","&","&",('x_active','=',True),["x_studio_periodo","=",False],["x_studio_unidades_de_negocio","=",unidad_negocio],["x_studio_stage_id",'in',[no_completado_nuevo,no_completado_revision]]]
 
         campos = ['x_name','x_studio_equipo','x_studio_descripcion','x_studio_linea','x_studio_proveedor','x_studio_ean',
                   'x_studio_actor_relevante','x_studio_trazabilidad_levantamiento','x_studio_stage_id']
@@ -944,7 +955,7 @@ class OdooDownloadDimerc(OdooDownloadBase):
         # DESCARGAR TABLA DE VENTAS
         # =========================
         modelo = 'x_unidades_vendidas'
-        filtros = [('x_studio_periodo_1.x_name','=',periodo)]
+        filtros = ['&',('x_studio_activo_producto','=',True),('x_studio_periodo_1.x_name','=',periodo)]
         campos = ['x_studio_producto','x_studio_descripcin','x_studio_todos_los_elementos'] + campos_ventas_totales
         header = ['Producto','Producto/Descripción','lista_elementos'] + header_ventas_totales 
         campos_fk = ['x_studio_producto']
@@ -1050,7 +1061,7 @@ class OdooDownloadIansa(OdooDownloadBase):
         - Ninguno: Ninguno. Se genera un archivo en el disco duro.
         """
         modelo = 'x_productos'
-        filtros = [('x_studio_razn_social','=',unidad_negocio)]
+        filtros = ['&',('x_studio_razn_social','=',unidad_negocio),('x_active','=',True)]
         campos = ['x_name','x_studio_stage_id']
         header = ['SKU','Etapa']
         campos_fk = ['x_studio_stage_id']
@@ -1078,7 +1089,7 @@ class OdooDownloadIansa(OdooDownloadBase):
         # DESCARGAR TABLA DE VENTAS
         # =========================
         modelo = 'x_unidades_vendidas'
-        filtros = ["&",('x_studio_periodo.x_name','=',periodo),('x_studio_razn_social','=',unidad_negocio)]
+        filtros = ["&",'&',('x_studio_activo_producto','=',True),('x_studio_periodo.x_name','=',periodo),('x_studio_razn_social','=',unidad_negocio)]
         campos = ['x_studio_producto','x_studio_descripcin','x_studio_todos_los_elementos','x_studio_total_unidades_vendidas']
         header = ['Producto','Producto/Descripción','lista_elementos','TOTAL Unidades Vendidas'] 
         campos_fk = ['x_studio_producto']
@@ -1179,7 +1190,7 @@ class OdooDownloadLuccetti(OdooDownloadBase):
         - Ninguno: Ninguno. Se genera un archivo en el disco duro.
         """
         modelo = 'x_productos'
-        filtros = []
+        filtros = [('x_active','=',True)]
         campos = ['x_name','x_studio_stage_id']
         header = ['Name','Etapa']
         campos_fk = ['x_studio_stage_id']
@@ -1206,10 +1217,10 @@ class OdooDownloadLuccetti(OdooDownloadBase):
         # =========================
 
         modelo = 'x_unidades_vendidas'
-        filtros = [('x_studio_periodo.x_name','=',periodo)]
-        campos = ['x_studio_producto','x_studio_descripcin','x_studio_unidades_vendidas','x_studio_todos_los_elementos']
-        header = ['Producto','Producto/Descripción','Unidades vendidas','lista elementos'] 
-        campos_fk = ['x_studio_producto']
+        filtros = ['&',('x_studio_activo_producto','=',True),('x_studio_periodo.x_name','=',periodo)]
+        campos = ['x_studio_producto','x_studio_descripcin','x_studio_categora_tmluc','x_studio_unidades_vendidas','x_studio_todos_los_elementos']
+        header = ['Producto','Producto/Descripción','Departamento','Unidades vendidas','lista elementos'] 
+        campos_fk = ['x_studio_producto','x_studio_categora_tmluc']
 
         un_vendidas = self.getDataFromModel(modelo,filtros,campos,header,campos_fk=campos_fk,ret_=True)
 
@@ -1245,7 +1256,7 @@ class OdooDownloadLuccetti(OdooDownloadBase):
         header1 = ['Producto','Producto/Descripción'] 
         header2 = ['Elemento del producto','Cantidades','Peso','Peso informado','Material','Característica del material','Composición material',
                 'Característica retornable','Característica reciclable','Peligrosidad','Categoría elemento','Sub-categoría material','Tipo de parte']
-        header3 = ['Unidades vendidas']
+        header3 = ['Departamento','Unidades vendidas']
         final_header = header1 + header2 + header3
 
         n_campos = len(final_header)

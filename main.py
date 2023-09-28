@@ -57,34 +57,33 @@ odoo_luccetti = OdooDownloadLuccetti(conn_params_luccetti)
 # ==============================================
 
 # ======================= DESCARGA PREDEFINIDA: DESCOMENTAR LA LINEA CORRESPONDIENTE
-# odoo_cenco.maestra('SMK')                     # SMK MDH TXD
-# odoo_cenco.comunicacion_masiva(2023,'SMK') 
+# odoo_cenco.maestra('TXD')                     # SMK MDH TXD
+# odoo_cenco.comunicacion_masiva(2023,'TXD') 
 # odoo_cenco.declaracion_eye(2023,'MDH')          # JUMBO SISA MDH TXD
-# odoo_cenco.entregable_eye(2023,'JUMBO')
+odoo_cenco.entregable_eye(2023,'JUMBO')
 
 # odoo_corona.maestra()
-# odoo_corona.maestra_homologos()
-# odoo_corona.comunicacion_masiva(2023,filename='Ejemplo corona')
+# odoo_corona.comunicacion_masiva(2023)
 # odoo_corona.declaracion_eye(2023)
-# odoo_corona.entregable_eye(2023)
+odoo_corona.entregable_eye(2023)
 
 # odoo_tottus.maestra(filename='Ejemplo tottus')
 # odoo_tottus.comunicacion_masiva(2023)
 # odoo_tottus.declaracion_eye(2023)
-# odoo_tottus.entregable_eye(2023)
+odoo_tottus.entregable_eye(2023)
 
-# odoo_dimerc.maestra('DIMERC')                           # DIMERC, PRONOBEL o DIMEIGGS
+# odoo_dimerc.maestra('PRONOBEL')                           # DIMERC, PRONOBEL o DIMEIGGS
 # odoo_dimerc.comunicacion_masiva(2023,'PRONOBEL')
 # odoo_dimerc.declaracion_eye(2023,'DIMEIGGS')
-# odoo_dimerc.entregable_eye(2023,'DIMERC')
+odoo_dimerc.entregable_eye(2023,'DIMERC')
 
 # odoo_iansa.maestra('LDA SPA')                           # "Agrocomercial IANSA", "IANSA Alimentos", "LDA SPA"
 # odoo_iansa.declaracion_eye(2023,'LDA SPA')
-# odoo_iansa.entregable_eye(2023,'Agrocomercial IANSA','coso isansa')
+odoo_iansa.entregable_eye(2023,'Agrocomercial IANSA','coso isansa')
 
 # odoo_luccetti.maestra()
 # odoo_luccetti.declaracion_eye(2023,'god')
-odoo_luccetti.entregable_eye(2023,filename='eye X14')
+odoo_luccetti.entregable_eye(2023)
 
 # ==============================================
 # ========= GENERAR ENTREGABLE EYE =============
